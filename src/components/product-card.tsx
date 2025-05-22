@@ -3,7 +3,7 @@
 
 import Link from 'next/link';
 import Image from 'next/image';
-import type { Product, ProductVariant } from '@/types'; // Added ProductVariant
+import type { Product, ProductVariant } from '@/types';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { ArrowRight, ShoppingCart } from 'lucide-react'; 
@@ -12,9 +12,10 @@ import { useToast } from '@/hooks/use-toast';
 
 interface ProductCardProps {
   product: Product;
+  onItemAddedToCart?: (productId: string) => void; // New optional callback
 }
 
-export function ProductCard({ product }: ProductCardProps) {
+export function ProductCard({ product, onItemAddedToCart }: ProductCardProps) {
   const { addToCart } = useCart();
   const { toast } = useToast();
 
@@ -34,7 +35,7 @@ export function ProductCard({ product }: ProductCardProps) {
         return;
     }
     addToCart(
-      { // Constructing a temporary object that matches Product type for addToCart
+      { 
         ...product,
         price: defaultVariant.price, 
         weight: defaultVariant.weight,
@@ -42,12 +43,13 @@ export function ProductCard({ product }: ProductCardProps) {
         defaultVariantIndex: product.defaultVariantIndex,
       }, 
       1,
-      defaultVariant // Pass selected variant for clarity
+      defaultVariant 
     ); 
     toast({
       title: "Added to cart!",
       description: `${product.name} (${defaultVariant.weight}) (x1) has been added.`,
     });
+    onItemAddedToCart?.(product.id); // Call the callback if provided
   };
 
   return (
@@ -58,9 +60,9 @@ export function ProductCard({ product }: ProductCardProps) {
             <Image
               src={firstImage.url}
               alt={product.name}
-              layout="fill"
-              objectFit="cover"
-              className="transition-transform duration-300 group-hover:scale-105"
+              fill
+              sizes="(max-width: 768px) 100vw, 50vw"
+              className="transition-transform duration-300 group-hover:scale-105 object-cover"
               data-ai-hint={firstImage.dataAiHint || 'spice product'}
             />
           </a>

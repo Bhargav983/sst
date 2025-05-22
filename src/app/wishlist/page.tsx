@@ -6,13 +6,15 @@ import { MainLayout } from '@/components/layout/main-layout';
 import { useWishlist } from '@/context/wishlist-context';
 import { getProductById } from '@/data/products';
 import type { Product } from '@/types';
-import { ProductCard } from '@/components/product-card'; // Re-using ProductCard for display
+import { ProductCard } from '@/components/product-card'; 
 import { Button } from '@/components/ui/button';
 import { HeartOff, ShoppingBag } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { useToast } from '@/hooks/use-toast'; // Import useToast
 
 export default function WishlistPage() {
   const { wishlistItems, removeFromWishlist, isWishlistReady } = useWishlist();
+  const { toast } = useToast(); // Initialize useToast
   
   if (!isWishlistReady) {
     return (
@@ -27,6 +29,17 @@ export default function WishlistPage() {
   const wishedProducts: Product[] = wishlistItems
     .map(productId => getProductById(productId))
     .filter((product): product is Product => product !== undefined);
+
+  const handleItemAddedToCartFromWishlist = (productId: string) => {
+    const product = getProductById(productId);
+    removeFromWishlist(productId);
+    if (product) {
+      toast({
+        title: "Moved to Cart",
+        description: `${product.name} has been moved from your wishlist to your cart.`,
+      });
+    }
+  };
 
   if (wishedProducts.length === 0) {
     return (
@@ -53,7 +66,10 @@ export default function WishlistPage() {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
           {wishedProducts.map(product => (
             <Card key={product.id} className="flex flex-col overflow-hidden rounded-lg shadow-md hover:shadow-lg transition-shadow duration-300 h-full group/wishlist-item">
-                <ProductCard product={product} />
+                <ProductCard 
+                  product={product} 
+                  onItemAddedToCart={() => handleItemAddedToCartFromWishlist(product.id)} // Pass the callback
+                />
                 <div className="p-4 border-t mt-auto">
                     <Button 
                         variant="outline" 
