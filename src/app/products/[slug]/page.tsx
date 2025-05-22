@@ -1,7 +1,7 @@
 
 "use client"; 
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { MainLayout } from '@/components/layout/main-layout';
@@ -15,6 +15,14 @@ import { Card, CardContent } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 
+const ZOOM_PANE_WIDTH = 400; // Width of the zoomed image display area
+const ZOOM_PANE_HEIGHT = 300; // Height of the zoomed image display area (maintaining 4:3 aspect ratio)
+const ZOOM_LEVEL = 2.5; // How much to magnify the image
+
+// Derived lens size based on zoom pane and zoom level
+const LENS_WIDTH = ZOOM_PANE_WIDTH / ZOOM_LEVEL;
+const LENS_HEIGHT = ZOOM_PANE_HEIGHT / ZOOM_LEVEL;
+
 export default function ProductDetailPage() {
   const router = useRouter();
   const params = useParams();
@@ -26,12 +34,18 @@ export default function ProductDetailPage() {
   const { addToCart } = useCart();
   const { toast } = useToast();
 
+  const [showZoom, setShowZoom] = useState(false);
+  const [zoomCoords, setZoomCoords] = useState({ x: 0, y: 0 }); // For backgroundPosition of zoom pane
+  const [lensPositionStyle, setLensPositionStyle] = useState({ top: 0, left: 0 }); // For lens element
+
+  const imageContainerRef = useRef<HTMLDivElement>(null);
+
   useEffect(() => {
     if (slug) {
       const foundProduct = getProductBySlug(slug);
       if (foundProduct && foundProduct.images && foundProduct.images.length > 0) {
         setProduct(foundProduct);
-        setSelectedImage(foundProduct.images[0]); // Set initial selected image
+        setSelectedImage(foundProduct.images[0]);
       } else {
         console.warn(`Product with slug "${slug}" not found or has no images.`);
         setProduct(null);
@@ -42,11 +56,9 @@ export default function ProductDetailPage() {
 
   const handleAddToCart = () => {
     if (product) {
-      // For CartItem, we need a single imageUrl. We'll use the first one.
       const cartProductImage = product.images[0]?.url || 'https://placehold.co/100x100.png';
-      
       addToCart(
-        { ...product, imageUrl: cartProductImage }, // Spread product and add/override imageUrl for CartItem type
+        { ...product, imageUrl: cartProductImage },
         quantity
       );
       toast({
@@ -56,38 +68,115 @@ export default function ProductDetailPage() {
     }
   };
 
-  if (!product || !selectedImage) {
-    // Basic loading/not found state
+  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (!imageContainerRef.current || !selectedImage) return;
+
+    const imgContainer = imageContainerRef.current;
+    const rect = imgContainer.getBoundingClientRect();
+
+    // Mouse position relative to the image container
+    let x = e.clientX - rect.left;
+    let y = e.clientY - rect.top;
+
+    // Calculate lens position
+    let lensX = x - LENS_WIDTH / 2;
+    let lensY = y - LENS_HEIGHT / 2;
+
+    // Constrain lens within image bounds
+    lensX = Math.max(0, Math.min(lensX, imgContainer.offsetWidth - LENS_WIDTH));
+    lensY = Math.max(0, Math.min(lensY, imgContainer.offsetHeight - LENS_HEIGHT));
+    setLensPositionStyle({ top: lensY, left: lensX });
+
+    // Calculate backgroundPosition for zoom pane
+    setZoomCoords({
+      x: -lensX * ZOOM_LEVEL,
+      y: -lensY * ZOOM_LEVEL,
+    });
+  };
+
+  const handleMouseEnter = () => {
+    if (product && product.images.length > 0) { // Only show zoom if there's an image
+        setShowZoom(true);
+    }
+  };
+
+  const handleMouseLeave = () => {
+    setShowZoom(false);
+  };
+
+  if (!product) { // Simplified loading/not found based on product only
     return (
       <MainLayout>
         <div className="flex flex-col items-center justify-center text-center py-10">
           <AlertTriangle className="w-16 h-16 text-destructive mb-4" />
           <h1 className="text-2xl font-semibold mb-2">Product Not Found</h1>
-          <p className="text-muted-foreground mb-6">Sorry, we couldn't find the product you're looking for or it has no images.</p>
+          <p className="text-muted-foreground mb-6">Sorry, we couldn't find the product you're looking for.</p>
           <Button onClick={() => router.push('/')}>Go to Homepage</Button>
         </div>
       </MainLayout>
     );
   }
+  
+  // Ensure selectedImage is valid before trying to use its URL for zoom pane
+  const validSelectedImageUrl = selectedImage?.url;
+
 
   return (
     <MainLayout>
       <div className="grid md:grid-cols-2 gap-8 lg:gap-12">
         {/* Image Gallery Section */}
-        <div className="flex flex-col gap-4">
-          <Card className="overflow-hidden shadow-lg rounded-lg">
-            <div className="aspect-[4/3] relative w-full">
-              <Image
-                src={selectedImage.url}
-                alt={product.name}
-                layout="fill"
-                objectFit="cover"
-                priority
-                data-ai-hint={selectedImage.dataAiHint || 'product image'}
-                className="rounded-t-lg"
+        <div className="flex flex-col gap-4 md:sticky md:top-24 self-start">
+           <div ref={imageContainerRef} className="relative"> {/* Container for main image card and zoom pane */}
+            <Card className="overflow-hidden shadow-lg rounded-lg">
+              <div
+                className="aspect-[4/3] relative w-full cursor-crosshair"
+                onMouseMove={handleMouseMove}
+                onMouseEnter={handleMouseEnter}
+                onMouseLeave={handleMouseLeave}
+              >
+                {selectedImage && (
+                  <Image
+                    src={selectedImage.url}
+                    alt={product.name}
+                    fill
+                    sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+                    priority
+                    data-ai-hint={selectedImage.dataAiHint || 'product image'}
+                    className="rounded-t-lg object-cover"
+                  />
+                )}
+                {showZoom && imageContainerRef.current && validSelectedImageUrl && ( // Lens
+                  <div
+                    className="absolute border-2 border-primary bg-white/30 pointer-events-none"
+                    style={{
+                      width: `${LENS_WIDTH}px`,
+                      height: `${LENS_HEIGHT}px`,
+                      top: `${lensPositionStyle.top}px`,
+                      left: `${lensPositionStyle.left}px`,
+                    }}
+                  />
+                )}
+              </div>
+            </Card>
+            
+            {/* Zoom Pane */}
+            {showZoom && validSelectedImageUrl && imageContainerRef.current && (
+              <div
+                className="absolute border border-gray-300 shadow-lg hidden md:block bg-no-repeat pointer-events-none z-10"
+                style={{
+                  width: `${ZOOM_PANE_WIDTH}px`,
+                  height: `${ZOOM_PANE_HEIGHT}px`,
+                  backgroundImage: `url(${validSelectedImageUrl})`,
+                  backgroundSize: `${imageContainerRef.current.offsetWidth * ZOOM_LEVEL}px ${imageContainerRef.current.offsetHeight * ZOOM_LEVEL}px`,
+                  backgroundPosition: `${zoomCoords.x}px ${zoomCoords.y}px`,
+                  top: `0px`,
+                  left: `calc(100% + 1rem)`, // Position to the right of the image card container
+                }}
               />
-            </div>
-          </Card>
+            )}
+          </div>
+
+          {/* Thumbnails */}
           {product.images.length > 1 && (
             <div className="grid grid-cols-5 gap-2">
               {product.images.map((image, index) => (
@@ -96,17 +185,17 @@ export default function ProductDetailPage() {
                   onClick={() => setSelectedImage(image)}
                   className={cn(
                     "aspect-square relative rounded-md overflow-hidden border-2 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 transition-all",
-                    selectedImage.url === image.url ? 'border-primary ring-2 ring-primary ring-offset-2' : 'border-border hover:border-primary/70'
+                    selectedImage?.url === image.url ? 'border-primary ring-2 ring-primary ring-offset-2' : 'border-border hover:border-primary/70'
                   )}
                   aria-label={`View image ${index + 1} of ${product.name}`}
                 >
                   <Image
                     src={image.url} 
                     alt={`${product.name} thumbnail ${index + 1}`}
-                    layout="fill"
-                    objectFit="cover"
+                    fill
+                    sizes="10vw"
                     data-ai-hint={image.dataAiHint || `product thumbnail ${index + 1}`}
-                    className="rounded"
+                    className="rounded object-cover"
                   />
                 </button>
               ))}
