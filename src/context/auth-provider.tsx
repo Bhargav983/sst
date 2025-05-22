@@ -7,7 +7,7 @@ import React, { createContext, useContext, useState, ReactNode, useEffect } from
 interface AuthContextType {
   user: AppUser | null;
   loading: boolean;
-  login: (userToLogin: AppUser) => void; // Changed to accept full AppUser object
+  login: (userToLogin: AppUser) => void; 
   logout: () => void;
 }
 
@@ -19,12 +19,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   useEffect(() => {
     // Simulate checking auth state on mount
-    // In a real app, this would involve Firebase Auth onAuthStateChanged listener
-    // And potentially fetching user data from localStorage or an API
     const storedUser = localStorage.getItem('sutraCartUser');
     if (storedUser) {
       try {
-        setUser(JSON.parse(storedUser));
+        const parsedUser: AppUser = JSON.parse(storedUser);
+        setUser(parsedUser);
       } catch (e) {
         console.error("Failed to parse stored user", e);
         localStorage.removeItem('sutraCartUser');
@@ -34,14 +33,21 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   const login = (userToLogin: AppUser) => {
-    setUser(userToLogin);
-    localStorage.setItem('sutraCartUser', JSON.stringify(userToLogin));
+    // Ensure all expected fields are present, even if optional in AppUser type for general use
+    const completeUser: AppUser = {
+        uid: userToLogin.uid,
+        email: userToLogin.email,
+        displayName: userToLogin.displayName || null,
+        phone: userToLogin.phone || null,
+        isAdmin: userToLogin.isAdmin || false,
+    };
+    setUser(completeUser);
+    localStorage.setItem('sutraCartUser', JSON.stringify(completeUser));
   };
 
   const logout = () => {
     setUser(null);
     localStorage.removeItem('sutraCartUser');
-    // Also clear admin-specific things if any in future
   };
 
   return (

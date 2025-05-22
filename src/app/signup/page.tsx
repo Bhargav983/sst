@@ -25,6 +25,7 @@ import {
 const signupSchema = z.object({
   fullName: z.string().min(2, { message: "Full name must be at least 2 characters." }),
   email: z.string().email({ message: "Invalid email address." }),
+  phone: z.string().min(10, { message: "Phone number must be at least 10 digits." }).regex(/^\+?[0-9\s-()]*$/, "Invalid phone number format"),
   password: z.string().min(6, { message: "Password must be at least 6 characters." }),
   confirmPassword: z.string().min(6, { message: "Password must be at least 6 characters." }),
 }).refine(data => data.password === data.confirmPassword, {
@@ -44,6 +45,7 @@ export default function SignupPage() {
     defaultValues: {
       fullName: '',
       email: '',
+      phone: '',
       password: '',
       confirmPassword: '',
     },
@@ -51,11 +53,16 @@ export default function SignupPage() {
 
   const onSubmit = async (data: SignupFormValues) => {
     // In a real app, this would call Firebase Auth:
-    // await firebaseSignup(data.email, data.password, data.fullName);
+    // await firebaseSignup(data.email, data.password, data.fullName, data.phone);
     console.log("Signup form submitted", data);
     
     // Simulate signup and login:
-    login({ uid: 'mock-new-uid', email: data.email, displayName: data.fullName });
+    login({ 
+      uid: 'mock-new-uid', 
+      email: data.email, 
+      displayName: data.fullName,
+      phone: data.phone 
+    });
     toast({
         title: "Account Created!",
         description: "Welcome to SutraCart!",
@@ -95,6 +102,19 @@ export default function SignupPage() {
                       <FormLabel>Email Address</FormLabel>
                       <FormControl>
                         <Input type="email" placeholder="you@example.com" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="phone"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Phone Number</FormLabel>
+                      <FormControl>
+                        <Input type="tel" placeholder="Enter your phone number" {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
