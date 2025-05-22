@@ -2,7 +2,7 @@
 "use client";
 
 import Link from 'next/link';
-import { ShoppingBag, User, LogIn, LogOut, ChefHat, ShieldCheck, ListOrdered } from 'lucide-react';
+import { ShoppingBag, User, LogIn, LogOut, ChefHat, ShieldCheck, Settings, ListOrdered } from 'lucide-react';
 import { useCart } from '@/context/cart-context';
 import { useAuth } from '@/context/auth-provider';
 import { Button } from '@/components/ui/button';
@@ -37,7 +37,8 @@ export function Header() {
           </Link>
           
           {user && (
-            <Link href="/profile/orders" className="text-sm font-medium text-foreground/70 hover:text-foreground transition-colors">
+            <Link href="/profile/orders" className="text-sm font-medium text-foreground/70 hover:text-foreground transition-colors flex items-center gap-1">
+               <ListOrdered className="h-5 w-5 md:hidden lg:inline-block" />
               My Orders
             </Link>
           )}
@@ -83,13 +84,12 @@ export function Header() {
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
-                  <DropdownMenuLabel>My Account</DropdownMenuLabel>
+                  <Link href="/profile/settings" passHref legacyBehavior>
+                    <DropdownMenuItem asChild>
+                      <a><Settings className="mr-2 h-4 w-4" />My Account</a>
+                    </DropdownMenuItem>
+                  </Link>
                   <DropdownMenuSeparator />
-                  {/* My Orders link removed from here */}
-                  {/* <Link href="/profile/settings" passHref legacyBehavior>
-                    <DropdownMenuItem asChild><a><Settings className="mr-2 h-4 w-4" />Settings</a></DropdownMenuItem>
-                  </Link> */}
-                  {/* If other profile links were needed, they would go here or below the separator */}
                   <DropdownMenuItem onClick={logout}>
                     <LogOut className="mr-2 h-4 w-4" />
                     Logout
