@@ -8,18 +8,20 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter }
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
-import { Package, User, MapPin, DollarSign, Clock, ArrowLeft, CheckCircle, ShoppingCart, AlertTriangle, Home, Download } from 'lucide-react';
+import { Package, User, MapPin, DollarSign, Clock, ArrowLeft, CheckCircle, ShoppingCart, AlertTriangle, Home, Download, Loader2 } from 'lucide-react';
 import type { Order, StatusHistoryEntry, CartItem, ShippingAddress } from '@/types';
 import { format } from 'date-fns';
 import Link from 'next/link';
 import Image from 'next/image';
 import { cn } from '@/lib/utils';
-import { jsPDF } from 'jspdf';
+import html2pdf from 'html2pdf.js';
+import ReactDOM from 'react-dom';
+import { InvoiceHTMLTemplate } from '@/components/invoice/invoice-html-template';
 
 
 // Helper function to generate a fallback order if not found in localStorage
 const generateFallbackOrder = (orderId: string): Order => {
-  const createdAt = new Date(); // Use current date for simplicity in fallback
+  const createdAt = new Date(); 
   const items: CartItem[] = [
     { id: 'prod1-fallback', name: 'Fallback Paste A', quantity: 1, price: 10.00, imageUrl: 'https://placehold.co/80x80.png', dataAiHint: 'product item', weight: '150g' },
     { id: 'prod2-fallback', name: 'Fallback Paste B', quantity: 2, price: 8.50, imageUrl: 'https://placehold.co/80x80.png', dataAiHint: 'product item', weight: '100g' },
@@ -65,10 +67,8 @@ const parseDateOrFallback = (dateInput: any, fallbackDate: Date = new Date()): D
     return isNaN(date.getTime()) ? fallbackDate : date;
 };
 
-// Creates a deeply sanitized version of the order for PDF generation
 const getSafeOrderForPdf = (currentOrder: Order | null): Order => {
     if (!currentOrder || typeof currentOrder.id !== 'string' || currentOrder.id === 'N/A' || currentOrder.id.startsWith('emergency')) {
-        // Generate a more distinct ID for fallbacks to make debugging easier
         return generateFallbackOrder('emergency-pdf-fallback-' + Date.now());
     }
 
@@ -91,6 +91,7 @@ const getSafeOrderForPdf = (currentOrder: Order | null): Order => {
         quantity: Number(item?.quantity || 1),
         imageUrl: String(item?.imageUrl || 'https://placehold.co/80x80.png'),
         weight: String(item?.weight || 'N/A'),
+        dataAiHint: String(item?.dataAiHint || 'product item'),
     }));
 
     const safeStatusHistory: StatusHistoryEntry[] = (Array.isArray(currentOrder.statusHistory) ? currentOrder.statusHistory : []).map(sh => ({
@@ -126,6 +127,7 @@ export default function UserOrderDetailPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isClient, setIsClient] = useState(false);
   const [orderForPdf, setOrderForPdf] = useState<Order | null>(null);
+  const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
 
 
   useEffect(() => {
@@ -173,6 +175,7 @@ export default function UserOrderDetailPage() {
                   quantity: Number(it?.quantity || 1),
                   imageUrl: String(it?.imageUrl || 'https://placehold.co/80x80.png'),
                   weight: String(it?.weight || 'N/A'),
+                  dataAiHint: String(it?.dataAiHint || 'product item'),
                 }));
 
                 const statusHistory: StatusHistoryEntry[] = (Array.isArray(o?.statusHistory) ? o.statusHistory : []).map((sh: any) => ({
@@ -241,190 +244,59 @@ export default function UserOrderDetailPage() {
     }
   };
 
-  const handleDownloadJsPdfInvoice = () => {
-    if (!orderForPdf) return;
-
-    const doc = new jsPDF({
-        orientation: 'p', // portrait
-        unit: 'mm', // millimeters
-        format: 'a4', // A4 size
-    });
-
-    const pageWidth = doc.internal.pageSize.getWidth();
-    const pageHeight = doc.internal.pageSize.getHeight();
-    const margin = 15; // mm
-    const contentWidth = pageWidth - margin * 2;
-    let y = margin;
-    const primaryLineHeight = 7; // mm, for primary text like titles or main content lines
-    const secondaryLineHeight = 5; // mm, for smaller text or sub-lines
-
-    // Helper function to add text and move y, centralizing y updates
-    const addTextAndAdvance = (text: string | string[], x: number, currentY: number, options: any = {}, customLineHeight?: number) => {
-        doc.text(text, x, currentY, options);
-        const lines = Array.isArray(text) ? text.length : 1;
-        return currentY + (customLineHeight || primaryLineHeight) * lines;
-    };
-    
-    const drawHorizontalLine = (currentY: number, customMargin?: number) => {
-        const lineMargin = customMargin === undefined ? margin : customMargin; // Use customMargin if provided, else default margin
-        doc.line(lineMargin, currentY, pageWidth - lineMargin, currentY);
-        return currentY + 2; // Small gap after line
-    };
-
-    // --- Invoice Header ---
-    doc.setFontSize(22);
-    doc.setFont('helvetica', 'bold');
-    y = addTextAndAdvance('SutraCart', margin, y, {}, primaryLineHeight * 1.2);
-
-    doc.setFontSize(18);
-    y = addTextAndAdvance('Invoice', margin, y);
-    
-    doc.setFontSize(10);
-    doc.setFont('helvetica', 'normal');
-    doc.text(`Order ID: ${orderForPdf.id}`, margin, y);
-    doc.text(`Date: ${format(parseDateOrFallback(orderForPdf.createdAt), 'PPP')}`, pageWidth - margin, y, { align: 'right' });
-    y += primaryLineHeight;
-    y = drawHorizontalLine(y);
-    y += secondaryLineHeight;
-
-    // --- Addresses ---
-    doc.setFontSize(12);
-    doc.setFont('helvetica', 'bold');
-    y = addTextAndAdvance('Shipping Address:', margin, y, {}, primaryLineHeight * 0.8);
-
-    doc.setFontSize(10);
-    doc.setFont('helvetica', 'normal');
-    const custInfo = orderForPdf.customerInfo;
-    y = addTextAndAdvance(custInfo.fullName, margin, y, {}, secondaryLineHeight);
-    y = addTextAndAdvance(custInfo.addressLine1, margin, y, {}, secondaryLineHeight);
-    if (custInfo.addressLine2) {
-      y = addTextAndAdvance(custInfo.addressLine2, margin, y, {}, secondaryLineHeight);
+  const handleDownloadHtml2PdfInvoice = async () => {
+    if (!orderForPdf || !isClient) return;
+    setIsGeneratingPdf(true);
+  
+    const invoiceElementId = 'invoice-to-print-container';
+    let invoiceContainer = document.getElementById(invoiceElementId);
+  
+    if (!invoiceContainer) {
+      invoiceContainer = document.createElement('div');
+      invoiceContainer.id = invoiceElementId;
+      // Apply styles to keep it off-screen but renderable for html2pdf
+      invoiceContainer.style.position = 'fixed'; // Use fixed to ensure it's out of flow but dimensions are respected
+      invoiceContainer.style.left = '-200vw'; // Way off-screen to the left
+      invoiceContainer.style.top = '0px';
+      invoiceContainer.style.zIndex = '-1'; // Ensure it's behind everything
+      invoiceContainer.style.width = '210mm'; // A4 width
+      invoiceContainer.style.visibility = 'hidden'; // Keep it hidden but allows rendering
+      document.body.appendChild(invoiceContainer);
     }
-    y = addTextAndAdvance(`${custInfo.city}, ${custInfo.state} - ${custInfo.postalCode}`, margin, y, {}, secondaryLineHeight);
-    y = addTextAndAdvance(custInfo.country, margin, y, {}, secondaryLineHeight);
-    y = addTextAndAdvance(`Email: ${custInfo.email}`, margin, y, {}, secondaryLineHeight);
-    y = addTextAndAdvance(`Phone: ${custInfo.phone}`, margin, y, {}, secondaryLineHeight);
-    y += primaryLineHeight * 0.5;
-    y = drawHorizontalLine(y);
-    y += primaryLineHeight * 0.5;
-
-    // --- Items Table Header ---
-    let tableHeaderY = y;
-    const drawTableHeader = () => {
-        doc.setFontSize(11);
-        doc.setFont('helvetica', 'bold');
-        const col1X = margin; // Item Description
-        const col2X = contentWidth * 0.60 + margin; // Quantity
-        const col3X = contentWidth * 0.75 + margin; // Unit Price
-        const col4X = pageWidth - margin; // Total (right aligned)
-        
-        doc.text('Item Description', col1X, tableHeaderY);
-        doc.text('Qty', col2X, tableHeaderY, { align: 'center' });
-        doc.text('Unit Price', col3X, tableHeaderY, { align: 'right' });
-        doc.text('Total', col4X, tableHeaderY, { align: 'right' });
-        tableHeaderY += secondaryLineHeight;
-        tableHeaderY = drawHorizontalLine(tableHeaderY);
-        tableHeaderY += secondaryLineHeight * 0.5;
-        return tableHeaderY;
+  
+    const root = ReactDOM.createRoot(invoiceContainer);
+    root.render(<InvoiceHTMLTemplate order={orderForPdf} />);
+  
+    // Give React a moment to render the component into the hidden div
+    await new Promise(resolve => setTimeout(resolve, 500)); 
+  
+    const opt = {
+      margin: 5, // mm for all sides
+      filename: `SutraCart-Invoice-${orderForPdf.id}.pdf`,
+      image: { type: 'jpeg', quality: 0.98 },
+      html2canvas: { scale: 2, logging: false, useCORS: true, scrollY: 0, windowWidth: invoiceContainer.scrollWidth, windowHeight: invoiceContainer.scrollHeight },
+      jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+      pagebreak: { mode: ['css', 'avoid-all'] }
     };
-    
-    y = drawTableHeader();
-
-
-    // --- Items Table Rows ---
-    doc.setFontSize(9);
-    doc.setFont('helvetica', 'normal');
-    (orderForPdf.items || []).forEach(item => {
-      const itemDescriptionMaxWidth = contentWidth * 0.55; // Max width for item name column
-      const itemNameLines = doc.splitTextToSize(`${item.name} (${item.weight || 'N/A'})`, itemDescriptionMaxWidth);
-      
-      const currentItemHeight = (itemNameLines.length * secondaryLineHeight * 0.8) + (secondaryLineHeight * 0.7) + 2; // Approx height with padding and line
-      
-      if (y + currentItemHeight > pageHeight - margin - 40) { // Check for page break (leave space for footer and totals)
-        doc.addPage();
-        y = margin;
-        tableHeaderY = y; // Reset tableHeaderY for the new page
-        y = drawTableHeader(); // Re-draw table headers on new page
-        doc.setFontSize(9);
-        doc.setFont('helvetica', 'normal');
+  
+    try {
+      // Ensure the element passed to html2pdf is the one containing the template
+      const elementToPrint = invoiceContainer.firstChild; 
+      if (elementToPrint) {
+        await html2pdf().from(elementToPrint).set(opt).save();
+      } else {
+        console.error("Invoice template element not found for PDF generation.");
       }
-
-      let itemLineY = y;
-      // Print item description lines
-      itemNameLines.forEach((line: string, index: number) => {
-        doc.text(line, margin, itemLineY + (index * secondaryLineHeight * 0.8) );
-      });
-
-      // Print other columns aligned with the first line of the item description
-      const col2X = contentWidth * 0.60 + margin; 
-      const col3X = contentWidth * 0.75 + margin;
-      const col4X = pageWidth - margin; 
-      doc.text(item.quantity.toString(), col2X, itemLineY, { align: 'center' });
-      doc.text(`₹${item.price.toFixed(2)}`, col3X, itemLineY, { align: 'right' });
-      doc.text(`₹${(item.price * item.quantity).toFixed(2)}`, col4X, itemLineY, { align: 'right' });
-      
-      // Advance y by the height of the current item content (max lines in description) + padding for line
-      y += Math.max(secondaryLineHeight * 0.8 * itemNameLines.length, secondaryLineHeight * 0.8); // Ensure at least one line height
-      y = drawHorizontalLine(y, margin + 2); // Thinner line for items, slightly indented
-      y += secondaryLineHeight * 0.7; // Padding after the line
-    });
-
-    // --- Totals ---
-    const totalsBlockHeight = primaryLineHeight * 4 + 5; // Approximate height for totals section including lines
-    if (y + totalsBlockHeight > pageHeight - margin - 15) { // Check if totals fit, -15 for footer space
-        doc.addPage();
-        y = margin;
-    } else {
-        // If there's a lot of space, push totals further down, but not too close to items
-        y = Math.max(y + primaryLineHeight, pageHeight - margin - 15 - totalsBlockHeight);
+    } catch (error) {
+      console.error("Error generating PDF with html2pdf.js:", error);
+      // Consider adding a user-facing toast notification for the error
+    } finally {
+      root.unmount();
+      if (invoiceContainer && invoiceContainer.parentNode === document.body) {
+        document.body.removeChild(invoiceContainer);
+      }
+      setIsGeneratingPdf(false);
     }
-    
-    y = drawHorizontalLine(y); 
-    y += primaryLineHeight * 0.5;
-
-    const totalsKeyX = contentWidth * 0.65 + margin; 
-    const totalsValueX = pageWidth - margin;   
-
-    doc.setFontSize(10);
-    doc.setFont('helvetica', 'normal');
-    doc.text('Subtotal:', totalsKeyX, y, { align: 'right' });
-    doc.text(`₹${orderForPdf.subtotal.toFixed(2)}`, totalsValueX, y, { align: 'right' });
-    y += primaryLineHeight;
-
-    doc.text('Shipping:', totalsKeyX, y, { align: 'right' });
-    doc.text(`₹${orderForPdf.shippingCost.toFixed(2)}`, totalsValueX, y, { align: 'right' });
-    y += primaryLineHeight * 0.5;
-    
-    const lineAboveTotalXStart = totalsKeyX - 10; // Start the line a bit before the text
-    doc.line(lineAboveTotalXStart, y, pageWidth - margin, y); // Line above grand total
-    y += primaryLineHeight * 0.5;    
-
-    doc.setFontSize(12);
-    doc.setFont('helvetica', 'bold');
-    doc.text('Grand Total:', totalsKeyX, y, { align: 'right' });
-    doc.text(`₹${orderForPdf.totalAmount.toFixed(2)}`, totalsValueX, y, { align: 'right' });
-    y += primaryLineHeight * 1.5;
-
-
-    // --- Footer ---
-    // Position footer text relative to the bottom of the page
-    const footerStartY = pageHeight - margin - (secondaryLineHeight * 2); // Start position for footer text
-
-    doc.setFontSize(9);
-    doc.setFont('helvetica', 'italic');
-    doc.text('Thank you for your business with SutraCart!', pageWidth / 2, footerStartY, { align: 'center' });
-
-    // Add page numbers to all pages
-    const totalPages = doc.internal.getNumberOfPages();
-    for (let i = 1; i <= totalPages; i++) {
-        doc.setPage(i); // Set current page to i
-        doc.setFontSize(8);
-        doc.setFont('helvetica', 'italic');
-        // Position page number slightly below the thank you message
-        doc.text(`Page ${i} of ${totalPages}`, pageWidth / 2, footerStartY + secondaryLineHeight, { align: 'center' });
-    }
-
-    doc.save(`SutraCart-Invoice-${orderForPdf.id}.pdf`);
   };
 
 
@@ -473,11 +345,14 @@ export default function UserOrderDetailPage() {
             <Button 
               variant="outline" 
               size="sm" 
-              onClick={handleDownloadJsPdfInvoice}
-              disabled={!canDownloadPdf}
+              onClick={handleDownloadHtml2PdfInvoice}
+              disabled={!canDownloadPdf || isGeneratingPdf}
             >
-              <Download className="mr-2 h-4 w-4" />
-              {canDownloadPdf ? 'Download Invoice' : 'Invoice Unavailable'}
+              {isGeneratingPdf ? 
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : 
+                <Download className="mr-2 h-4 w-4" />
+              }
+              {isGeneratingPdf ? 'Generating...' : (canDownloadPdf ? 'Download Invoice' : 'Invoice Unavailable')}
             </Button>
           </div>
           <h1 className="text-2xl sm:text-3xl font-bold text-center sm:text-left mt-4 sm:mt-0">Order Details</h1>
@@ -510,7 +385,7 @@ export default function UserOrderDetailPage() {
             <CardContent className="divide-y">
               {(order.items || []).map(item => (
                 <div key={item.id} className="flex items-center gap-4 py-4">
-                  <Image src={item.imageUrl} alt={item.name} width={80} height={80} className="rounded-md border" data-ai-hint="product item" />
+                  <Image src={item.imageUrl} alt={item.name} width={80} height={80} className="rounded-md border" data-ai-hint={item.dataAiHint || "product item"} />
                   <div className="flex-grow">
                     <p className="font-semibold">{item.name || 'Unknown Item'}</p>
                     <p className="text-sm text-muted-foreground">Qty: {item.quantity || 1} &bull; {item.weight || 'N/A'}</p>
