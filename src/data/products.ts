@@ -1,7 +1,8 @@
 
 import type { Product, ProductVariant } from '@/types';
 
-const calculatePricePerUnit = (price: number, weightString: string, unitWeight: number = 100, unitLabel: string = "g"): string => {
+// Export this function
+export const calculatePricePerUnit = (price: number, weightString: string, unitWeight: number = 100, unitLabel: string = "g"): string => {
   const weightMatch = weightString.match(/(\d+)/);
   if (!weightMatch) return '';
   const weightValue = parseFloat(weightMatch[1]);
@@ -14,15 +15,29 @@ const calculatePricePerUnit = (price: number, weightString: string, unitWeight: 
 
 const generateVariants = (basePrice: number, baseWeight: number, weights: number[]): ProductVariant[] => {
   return weights.map((w, index) => {
-    // Simple scaling: price increases less than linearly with weight
     const priceMultiplier = w / baseWeight;
-    const price = parseFloat((basePrice * Math.pow(priceMultiplier, 0.85)).toFixed(2)); // Adjust exponent for desired scaling
+    const retailPrice = parseFloat((basePrice * Math.pow(priceMultiplier, 0.85)).toFixed(2));
     const weightStr = `${w}g`;
+
+    // Wholesale specific logic
+    // Example: larger packs have smaller min qty for wholesale, smaller packs might have higher min qty
+    let wholesaleMinQuantity;
+    if (w <= 100) {
+      wholesaleMinQuantity = 10; // Min 10 units for 100g packs
+    } else if (w <= 250) {
+      wholesaleMinQuantity = 5;  // Min 5 units for 250g packs
+    } else {
+      wholesaleMinQuantity = 3;  // Min 3 units for 500g+ packs
+    }
+    const wholesalePrice = parseFloat((retailPrice * 0.85).toFixed(2)); // 15% discount for wholesale
+
     return {
       weight: weightStr,
-      price: price,
-      pricePerUnit: calculatePricePerUnit(price, weightStr),
-      sku: `SKU-${baseWeight}-${w}-${index}`
+      price: retailPrice,
+      pricePerUnit: calculatePricePerUnit(retailPrice, weightStr),
+      sku: `SKU-${baseWeight}-${w}-${index}`,
+      wholesalePrice: wholesalePrice,
+      wholesaleMinQuantity: wholesaleMinQuantity,
     };
   });
 };
@@ -37,10 +52,10 @@ export const products: Product[] = [
     longDescription: 'Experience the authentic taste of Andhra Pradesh with our Chilli Paste. Made from sun-dried Guntur chillies and a secret blend of spices, this paste is perfect for adding a spicy kick to your curries, stir-fries, or as a marinade. Its robust flavor and vibrant color will elevate any dish.',
     images: [
       { url: 'https://placehold.co/600x400.png', dataAiHint: 'chilli paste main' },
-      { url: 'https://placehold.co/600x400.png', dataAiHint: 'chilli paste closeup' },
-      { url: 'https://placehold.co/600x400.png', dataAiHint: 'chilli paste ingredients' },
-      { url: 'https://placehold.co/600x400.png', dataAiHint: 'chilli paste texture' },
-      { url: 'https://placehold.co/600x400.png', dataAiHint: 'chilli paste jar' }
+      { url: 'https://placehold.co/100x100.png', dataAiHint: 'chilli paste closeup' },
+      { url: 'https://placehold.co/100x100.png', dataAiHint: 'chilli paste ingredients' },
+      { url: 'https://placehold.co/100x100.png', dataAiHint: 'chilli paste texture' },
+      { url: 'https://placehold.co/100x100.png', dataAiHint: 'chilli paste jar' }
     ],
     category: 'Spicy',
     defaultVariantIndex: 1, // 250g
@@ -54,10 +69,10 @@ export const products: Product[] = [
     longDescription: 'Our Kerala Coconut Curry Paste brings the taste of the Malabar coast to your kitchen. A harmonious blend of freshly grated coconut, ginger, garlic, and fragrant spices like cardamom and cloves. Ideal for creating authentic fish curries, vegetable stews, or chicken preparations.',
     images: [
       { url: 'https://placehold.co/600x400.png', dataAiHint: 'coconut curry main' },
-      { url: 'https://placehold.co/600x400.png', dataAiHint: 'coconut curry closeup' },
-      { url: 'https://placehold.co/600x400.png', dataAiHint: 'coconut curry ingredients' },
-      { url: 'https://placehold.co/600x400.png', dataAiHint: 'coconut curry texture' },
-      { url: 'https://placehold.co/600x400.png', dataAiHint: 'coconut curry dish' }
+      { url: 'https://placehold.co/100x100.png', dataAiHint: 'coconut curry closeup' },
+      { url: 'https://placehold.co/100x100.png', dataAiHint: 'coconut curry ingredients' },
+      { url: 'https://placehold.co/100x100.png', dataAiHint: 'coconut curry texture' },
+      { url: 'https://placehold.co/100x100.png', dataAiHint: 'coconut curry dish' }
     ],
     category: 'Mild',
     defaultVariantIndex: 1, // 250g
@@ -71,10 +86,10 @@ export const products: Product[] = [
     longDescription: 'Discover the unique tangy flavor of South Indian cuisine with our Tamilian Tamarind Paste. Made from pure tamarind pulp and blended with traditional spices, it adds depth and complexity to sambar, rasam, and various gravies. A versatile ingredient for authentic Tamil flavors.',
     images: [
       { url: 'https://placehold.co/600x400.png', dataAiHint: 'tamarind paste main' },
-      { url: 'https://placehold.co/600x400.png', dataAiHint: 'tamarind paste closeup' },
-      { url: 'https://placehold.co/600x400.png', dataAiHint: 'tamarind fruit' },
-      { url: 'https://placehold.co/600x400.png', dataAiHint: 'tamarind paste texture' },
-      { url: 'https://placehold.co/600x400.png', dataAiHint: 'tamarind paste usage' }
+      { url: 'https://placehold.co/100x100.png', dataAiHint: 'tamarind paste closeup' },
+      { url: 'https://placehold.co/100x100.png', dataAiHint: 'tamarind fruit' },
+      { url: 'https://placehold.co/100x100.png', dataAiHint: 'tamarind paste texture' },
+      { url: 'https://placehold.co/100x100.png', dataAiHint: 'tamarind paste usage' }
     ],
     category: 'Tangy',
     defaultVariantIndex: 0, // 200g
@@ -88,10 +103,10 @@ export const products: Product[] = [
     longDescription: 'A fundamental ingredient in Indian cooking, our Karnataka Garlic-Ginger Paste is made from the freshest, locally sourced garlic and ginger. This smooth, aromatic paste saves you prep time and adds a foundational flavor to a wide array of vegetarian and non-vegetarian dishes.',
     images: [
       { url: 'https://placehold.co/600x400.png', dataAiHint: 'garlic ginger main' },
-      { url: 'https://placehold.co/600x400.png', dataAiHint: 'garlic ginger closeup' },
-      { url: 'https://placehold.co/600x400.png', dataAiHint: 'fresh garlic ginger' },
-      { url: 'https://placehold.co/600x400.png', dataAiHint: 'ginger paste texture' },
-      { url: 'https://placehold.co/600x400.png', dataAiHint: 'garlic paste cooking' }
+      { url: 'https://placehold.co/100x100.png', dataAiHint: 'garlic ginger closeup' },
+      { url: 'https://placehold.co/100x100.png', dataAiHint: 'fresh garlic ginger' },
+      { url: 'https://placehold.co/100x100.png', dataAiHint: 'ginger paste texture' },
+      { url: 'https://placehold.co/100x100.png', dataAiHint: 'garlic paste cooking' }
     ],
     category: 'Aromatic',
     defaultVariantIndex: 0, // 200g

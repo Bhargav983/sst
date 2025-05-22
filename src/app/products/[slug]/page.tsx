@@ -5,18 +5,19 @@ import { useState, useEffect, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { MainLayout } from '@/components/layout/main-layout';
-import { getProductBySlug } from '@/data/products';
+import { getProductBySlug, calculatePricePerUnit } from '@/data/products'; // Import calculatePricePerUnit
 import type { Product, ProductImage, ProductVariant } from '@/types';
 import { Button } from '@/components/ui/button';
 import { useCart } from '@/context/cart-context';
 import { QuantitySelector } from '@/components/quantity-selector';
-import { AlertTriangle, ShoppingCart, Zap, Weight, Heart } from 'lucide-react'; // Added Heart
+import { AlertTriangle, ShoppingCart, Zap, Weight, Heart, Info } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
-import { useWishlist } from '@/context/wishlist-context'; // Added useWishlist
+import { useWishlist } from '@/context/wishlist-context';
+import { useAuth } from '@/context/auth-provider'; // Import useAuth
 
 const ZOOM_PANE_WIDTH = 400;
 const ZOOM_PANE_HEIGHT = 300;
@@ -29,19 +30,23 @@ export default function ProductDetailPage() {
   const params = useParams();
   const slug = typeof params.slug === 'string' ? params.slug : '';
   
+  const { user, loading: authLoading } = useAuth(); // Get user and authLoading state
   const [product, setProduct] = useState<Product | null>(null);
   const [selectedImage, setSelectedImage] = useState<ProductImage | null>(null);
   const [selectedVariant, setSelectedVariant] = useState<ProductVariant | null>(null);
   const [quantity, setQuantity] = useState(1);
   const { addToCart } = useCart();
   const { toast } = useToast();
-  const { addToWishlist, removeFromWishlist, isInWishlist, isWishlistReady } = useWishlist(); // Destructure wishlist hooks
+  const { addToWishlist, removeFromWishlist, isInWishlist, isWishlistReady } = useWishlist();
 
   const [showZoom, setShowZoom] = useState(false);
   const [zoomCoords, setZoomCoords] = useState({ x: 0, y: 0 });
   const [lensPositionStyle, setLensPositionStyle] = useState({ top: 0, left: 0 });
-
   const imageContainerRef = useRef<HTMLDivElement>(null);
+
+  // State for effective price and wholesale eligibility
+  const [effectivePrice, setEffectivePrice] = useState<number>(0);
+  const [isWholesaleEligible, setIsWholesaleEligible] = useState<boolean>(false);
 
   useEffect(() => {
     if (slug) {
@@ -51,38 +56,79 @@ export default function ProductDetailPage() {
         if (foundProduct.images && foundProduct.images.length > 0) {
           setSelectedImage(foundProduct.images[0]);
         }
-        if (foundProduct.variants && foundProduct.variants.length > 0) {
-          setSelectedVariant(foundProduct.variants[foundProduct.defaultVariantIndex || 0]);
+        const initialVar = foundProduct.variants[foundProduct.defaultVariantIndex || 0];
+        setSelectedVariant(initialVar);
+        
+        // Set initial quantity based on user role and variant's wholesale info
+        // This part of the effect will re-run if 'user' changes after initial load
+        if (user?.role === 'wholesale' && initialVar?.wholesalePrice && typeof initialVar?.wholesaleMinQuantity === 'number') {
+          setQuantity(initialVar.wholesaleMinQuantity);
+        } else {
+          setQuantity(1);
         }
       } else {
         setProduct(null);
         setSelectedImage(null);
         setSelectedVariant(null);
+        setQuantity(1);
       }
     }
-  }, [slug]);
+  }, [slug, user]); // Add user as a dependency
+
+  // Effect to update effective price and wholesale eligibility
+  useEffect(() => {
+    if (selectedVariant) {
+      const wholesaleEligible =
+        user?.role === 'wholesale' &&
+        selectedVariant.wholesalePrice &&
+        typeof selectedVariant.wholesaleMinQuantity === 'number' &&
+        quantity >= selectedVariant.wholesaleMinQuantity;
+
+      setIsWholesaleEligible(wholesaleEligible);
+      setEffectivePrice(
+        wholesaleEligible && selectedVariant.wholesalePrice
+          ? selectedVariant.wholesalePrice
+          : selectedVariant.price
+      );
+    }
+  }, [quantity, selectedVariant, user]);
+
 
   const handleVariantChange = (variantSkuOrWeight: string) => {
     if (product && product.variants) {
       const newVariant = product.variants.find(v => v.weight === variantSkuOrWeight || v.sku === variantSkuOrWeight);
       if (newVariant) {
         setSelectedVariant(newVariant);
+        // Adjust quantity if user is wholesale and new variant has different wholesale min
+        if (user?.role === 'wholesale' && newVariant.wholesalePrice && typeof newVariant.wholesaleMinQuantity === 'number') {
+          // If current quantity is less than new min, set to new min. Otherwise, keep current quantity.
+          if (quantity < newVariant.wholesaleMinQuantity) {
+            setQuantity(newVariant.wholesaleMinQuantity);
+          }
+        } else {
+           // If not wholesale or no wholesale data for new variant, ensure quantity is at least 1
+           // or keep current if it's already > 1 and not a wholesale context change
+           if (quantity < 1) setQuantity(1);
+        }
       }
     }
   };
   
   const handleCartAction = (isBuyNow: boolean) => {
     if (product && selectedVariant) {
+      const priceToUse = isWholesaleEligible && selectedVariant.wholesalePrice ? selectedVariant.wholesalePrice : selectedVariant.price;
       addToCart(
         { 
-          ...product,
-          price: selectedVariant.price, 
+          ...product, // Spread base product details
+          // Override price/weight with selected variant's effective details for the cart
+          price: priceToUse, 
           weight: selectedVariant.weight, 
+          // Pass all variants and default index, cart context might need them
           variants: product.variants, 
-          defaultVariantIndex: product.defaultVariantIndex,
+          defaultVariantIndex: product.variants.findIndex(v => v.sku === selectedVariant.sku || v.weight === selectedVariant.weight),
         },
         quantity,
-        selectedVariant 
+        selectedVariant // Pass the full selectedVariant object
       );
       if (!isBuyNow) {
         toast({
@@ -128,6 +174,14 @@ export default function ProductDetailPage() {
 
   const handleMouseEnter = () => { if (product && product.images.length > 0) setShowZoom(true); };
   const handleMouseLeave = () => setShowZoom(false);
+
+  if (authLoading && !product) { // Show loading if auth is pending and product not yet loaded
+    return (
+      <MainLayout>
+        <div className="text-center py-10">Loading product details...</div>
+      </MainLayout>
+    );
+  }
 
   if (!product || !selectedVariant) {
     return (
@@ -221,9 +275,41 @@ export default function ProductDetailPage() {
           <h1 className="text-3xl lg:text-4xl font-bold text-primary mb-3">{product.name}</h1>
           
           <div className="mb-4">
-            <p className="text-2xl font-semibold text-foreground">₹{selectedVariant.price.toFixed(2)}</p>
-            {selectedVariant.pricePerUnit && <p className="text-sm text-muted-foreground">{selectedVariant.pricePerUnit}</p>}
+            <p className="text-2xl font-semibold text-foreground">
+              ₹{effectivePrice.toFixed(2)}
+              {isWholesaleEligible && selectedVariant.wholesalePrice && (
+                <span className="ml-2 text-sm text-green-600 line-through">
+                  (Retail: ₹{selectedVariant.price.toFixed(2)})
+                </span>
+              )}
+            </p>
+            {/* Display retail price per unit or wholesale price per unit */}
+            {isWholesaleEligible && selectedVariant.wholesalePrice ? (
+                 <p className="text-sm text-muted-foreground">
+                   {calculatePricePerUnit(selectedVariant.wholesalePrice, selectedVariant.weight)} (Wholesale)
+                 </p>
+            ) : (
+              selectedVariant.pricePerUnit && (
+                <p className="text-sm text-muted-foreground">{selectedVariant.pricePerUnit}</p>
+              )
+            )}
           </div>
+
+          {/* Wholesale User Info Card */}
+          {!authLoading && user?.role === 'wholesale' && selectedVariant && selectedVariant.wholesalePrice && typeof selectedVariant.wholesaleMinQuantity === 'number' && (
+            <Card className="mb-4 bg-green-50 border-green-200 shadow-sm">
+              <CardContent className="p-3">
+                <p className="text-sm text-green-700 flex items-center">
+                  <Info className="inline h-5 w-5 mr-2 flex-shrink-0" />
+                  <span>
+                    Wholesale Offer: Get this for <span className="font-bold">₹{selectedVariant.wholesalePrice.toFixed(2)}</span> each
+                    when you buy {selectedVariant.wholesaleMinQuantity} or more.
+                  </span>
+                </p>
+              </CardContent>
+            </Card>
+          )}
+
 
           {product.variants.length > 1 && (
             <Card className="mb-6 shadow rounded-lg">
@@ -267,7 +353,9 @@ export default function ProductDetailPage() {
           </Card>
 
           <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 mb-4">
-            <QuantitySelector quantity={quantity} onQuantityChange={setQuantity} />
+            <QuantitySelector quantity={quantity} onQuantityChange={setQuantity} 
+              min={isWholesaleEligible && selectedVariant.wholesaleMinQuantity ? 1 : 1} // Min is always 1, but wholesale logic in useEffect handles actual price.
+            />
           </div>
           <div className="flex flex-col sm:flex-row items-stretch gap-3">
              <Button size="lg" onClick={() => handleCartAction(false)} className="w-full sm:w-auto shadow-md flex-1">
@@ -280,7 +368,7 @@ export default function ProductDetailPage() {
               variant="outline" 
               size="lg" 
               onClick={handleWishlistToggle} 
-              className="w-full sm:w-auto shadow-md flex-grow-0 sm:flex-grow-0" // Adjusted flex properties
+              className="w-full sm:w-auto shadow-md flex-grow-0 sm:flex-grow-0"
               aria-label={isProductInWishlist ? "Remove from Wishlist" : "Add to Wishlist"}
               disabled={!isWishlistReady}
             >
