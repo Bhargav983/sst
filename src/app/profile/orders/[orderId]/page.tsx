@@ -20,8 +20,8 @@ import { useToast } from '@/hooks/use-toast';
 const generateFallbackOrder = (orderId: string): Order => {
   const createdAt = new Date(Date.now() - Math.floor(Math.random() * 10) * 24 * 60 * 60 * 1000);
   const items: CartItem[] = [
-    { id: 'prod1-fallback', name: 'Fallback Paste A', quantity: 1, price: 10.00, imageUrl: 'https://placehold.co/80x80.png', weight: '150g' },
-    { id: 'prod2-fallback', name: 'Fallback Paste B', quantity: 2, price: 8.50, imageUrl: 'https://placehold.co/80x80.png', weight: '100g' },
+    { id: 'prod1-fallback', name: 'Fallback Paste A', quantity: 1, price: 10.00, imageUrl: 'https://placehold.co/80x80.png', dataAiHint: 'product item', weight: '150g' },
+    { id: 'prod2-fallback', name: 'Fallback Paste B', quantity: 2, price: 8.50, imageUrl: 'https://placehold.co/80x80.png', dataAiHint: 'product item', weight: '100g' },
   ];
   const subtotal = items.reduce((sum, item) => sum + item.price * item.quantity, 0);
   const shippingCost = 5.00;
@@ -73,11 +73,9 @@ export default function UserOrderDetailPage() {
       return;
     }
 
-    // Simulate fetching the order details
-    // In a real app, you'd fetch this from your backend/Firebase using the orderId
     const fetchOrder = async () => {
       setIsLoading(true);
-      await new Promise(resolve => setTimeout(resolve, 300)); // Simulate network delay
+      await new Promise(resolve => setTimeout(resolve, 300)); 
 
       let foundOrder: Order | undefined;
       if (typeof window !== 'undefined') {
@@ -85,7 +83,6 @@ export default function UserOrderDetailPage() {
         if (storedOrdersRaw) {
           try {
             const allOrders: Order[] = JSON.parse(storedOrdersRaw);
-            // Ensure dates are parsed correctly from localStorage
             foundOrder = allOrders.map(o => ({
                 ...o,
                 createdAt: new Date(o.createdAt),
@@ -101,7 +98,6 @@ export default function UserOrderDetailPage() {
       if (foundOrder) {
         setOrder(foundOrder);
       } else {
-        // If not found in localStorage (e.g., direct navigation or data wiped), generate a fallback
         console.warn(`Order ${orderId} not found in mock storage. Displaying fallback.`);
         setOrder(generateFallbackOrder(orderId));
       }
@@ -112,14 +108,50 @@ export default function UserOrderDetailPage() {
   }, [orderId]);
 
   const handleDownloadInvoice = () => {
-    console.log(`Simulating invoice download for order: ${orderId}`);
-    toast({
-      title: "Invoice Download Started",
-      description: `Your invoice for order #${orderId} is being prepared.`,
+    if (!order) return;
+
+    let invoiceContent = `SutraCart Invoice\n`;
+    invoiceContent += `------------------------------------\n`;
+    invoiceContent += `Order ID: ${order.id}\n`;
+    invoiceContent += `Order Date: ${format(new Date(order.createdAt), 'PPpp')}\n`;
+    invoiceContent += `Status: ${order.status}\n`;
+    invoiceContent += `Payment Status: ${order.paymentStatus}\n\n`;
+
+    invoiceContent += `Customer Information:\n`;
+    invoiceContent += `Name: ${order.customerInfo.fullName}\n`;
+    invoiceContent += `Email: ${order.customerInfo.email}\n`;
+    invoiceContent += `Phone: ${order.customerInfo.phone || 'N/A'}\n`;
+    invoiceContent += `Address: ${order.customerInfo.addressLine1}${order.customerInfo.addressLine2 ? `, ${order.customerInfo.addressLine2}` : ''}\n`;
+    invoiceContent += `         ${order.customerInfo.city}, ${order.customerInfo.state} - ${order.customerInfo.postalCode}\n`;
+    invoiceContent += `         ${order.customerInfo.country}\n\n`;
+
+    invoiceContent += `Items:\n`;
+    order.items.forEach(item => {
+      invoiceContent += `- ${item.name} (x${item.quantity}) - ${item.weight} @ ₹${item.price.toFixed(2)} each: ₹${(item.price * item.quantity).toFixed(2)}\n`;
     });
-    // In a real app, you would trigger the actual download here.
-    // For example, by creating a hidden <a> element and clicking it,
-    // or by calling a backend endpoint that returns the PDF.
+    invoiceContent += `\n`;
+
+    invoiceContent += `Subtotal: ₹${order.subtotal.toFixed(2)}\n`;
+    invoiceContent += `Shipping: ₹${order.shippingCost.toFixed(2)}\n`;
+    invoiceContent += `Total Amount: ₹${order.totalAmount.toFixed(2)}\n\n`;
+
+    invoiceContent += `Thank you for your order!\n`;
+    invoiceContent += `------------------------------------\n`;
+
+    const blob = new Blob([invoiceContent], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `invoice-${order.id}.txt`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+
+    toast({
+      title: "Invoice Downloading",
+      description: `Invoice for order #${orderId} is being downloaded as a text file.`,
+    });
   };
 
   const getStatusBadgeVariant = (status: Order['status'] | undefined) => {
@@ -321,7 +353,6 @@ export default function UserOrderDetailPage() {
     </MainLayout>
   );
 }
-
     
 
     
