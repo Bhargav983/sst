@@ -175,18 +175,22 @@ const formatDateSafe = (dateInput: Date | string | number | undefined): string =
   if (isNaN(date.getTime())) {
     return 'Invalid Date';
   }
-  return date.toLocaleDateString(); // Or any other format you prefer
+  // Using a simple format to avoid locale issues in PDF rendering if any
+  const day = String(date.getDate()).padStart(2, '0');
+  const month = String(date.getMonth() + 1).padStart(2, '0'); // Month is 0-indexed
+  const year = date.getFullYear();
+  return `${day}/${month}/${year}`;
 };
 
 const InvoicePDF: React.FC<InvoicePDFProps> = ({ order }) => (
-  <Document title={`Invoice-${order.id}`} author="SutraCart">
+  <Document title={`Invoice-${order?.id || 'unknown'}`} author="SutraCart">
     <Page size="A4" style={styles.page}>
       <View style={styles.header}>
         <Text style={styles.companyName}>SutraCart</Text>
         <View style={styles.invoiceTitleSection}>
           <Text style={styles.invoiceTitle}>INVOICE</Text>
-          <Text style={styles.headerInfoText}>Order ID: {order.id || 'N/A'}</Text>
-          <Text style={styles.headerInfoText}>Date: {formatDateSafe(order.createdAt)}</Text>
+          <Text style={styles.headerInfoText}>Order ID: {order?.id || 'N/A'}</Text>
+          <Text style={styles.headerInfoText}>Date: {formatDateSafe(order?.createdAt)}</Text>
         </View>
       </View>
 
@@ -194,20 +198,20 @@ const InvoicePDF: React.FC<InvoicePDFProps> = ({ order }) => (
         <View style={[styles.section, {width: '48%'}]}>
             <Text style={styles.sectionTitle}>Billed To</Text>
             <View style={styles.addressBlock}>
-            <Text style={styles.text}>{order.customerInfo?.fullName || 'N/A'}</Text>
-            <Text style={styles.text}>{order.customerInfo?.email || 'N/A'}</Text>
-            <Text style={styles.text}>{order.customerInfo?.phone || 'N/A'}</Text>
+            <Text style={styles.text}>{order?.customerInfo?.fullName || 'N/A'}</Text>
+            <Text style={styles.text}>{order?.customerInfo?.email || 'N/A'}</Text>
+            <Text style={styles.text}>{order?.customerInfo?.phone || 'N/A'}</Text>
             </View>
         </View>
         <View style={[styles.section, {width: '48%'}]}>
             <Text style={styles.sectionTitle}>Shipping Address</Text>
             <View style={styles.addressBlock}>
-            <Text style={styles.text}>{order.customerInfo?.addressLine1 || 'N/A'}</Text>
-            {order.customerInfo?.addressLine2 && <Text style={styles.text}>{order.customerInfo.addressLine2}</Text>}
+            <Text style={styles.text}>{order?.customerInfo?.addressLine1 || 'N/A'}</Text>
+            {order?.customerInfo?.addressLine2 && <Text style={styles.text}>{order.customerInfo.addressLine2}</Text>}
             <Text style={styles.text}>
-                {order.customerInfo?.city || 'N/A'}, {order.customerInfo?.state || 'N/A'} - {order.customerInfo?.postalCode || 'N/A'}
+                {order?.customerInfo?.city || 'N/A'}, {order?.customerInfo?.state || 'N/A'} - {order?.customerInfo?.postalCode || 'N/A'}
             </Text>
-            <Text style={styles.text}>{order.customerInfo?.country || 'N/A'}</Text>
+            <Text style={styles.text}>{order?.customerInfo?.country || 'N/A'}</Text>
             </View>
         </View>
       </View>
@@ -231,19 +235,19 @@ const InvoicePDF: React.FC<InvoicePDFProps> = ({ order }) => (
             </View>
           </View>
           {/* Table Body */}
-          {(order.items || []).map((item, index) => (
-            <View style={index === (order.items || []).length - 1 ? styles.tableRowLast : styles.tableRow} key={item.id || index}>
+          {Array.isArray(order?.items) && order.items.map((item, index) => (
+            <View style={index === (order.items || []).length - 1 ? styles.tableRowLast : styles.tableRow} key={item?.id || index}>
               <View style={[styles.colItem, styles.tableColContainer]}>
-                <Text style={styles.dataTextCell}>{item.name || 'N/A'} ({item.weight || 'N/A'})</Text>
+                <Text style={styles.dataTextCell}>{(item?.name || 'N/A')} ({(item?.weight || 'N/A')})</Text>
               </View>
               <View style={[styles.colQty, styles.tableColContainer]}>
-                <Text style={[styles.dataTextCell, styles.rightAlignedText]}>{item.quantity || 0}</Text>
+                <Text style={[styles.dataTextCell, styles.rightAlignedText]}>{item?.quantity || 0}</Text>
               </View>
               <View style={[styles.colPrice, styles.tableColContainer]}>
-                <Text style={[styles.dataTextCell, styles.rightAlignedText]}>{(item.price || 0).toFixed(2)}</Text>
+                <Text style={[styles.dataTextCell, styles.rightAlignedText]}>{(item?.price || 0).toFixed(2)}</Text>
               </View>
               <View style={[styles.colTotal, styles.tableColContainerLast]}>
-                <Text style={[styles.dataTextCell, styles.rightAlignedText]}>{((item.price || 0) * (item.quantity || 0)).toFixed(2)}</Text>
+                <Text style={[styles.dataTextCell, styles.rightAlignedText]}>{((item?.price || 0) * (item?.quantity || 0)).toFixed(2)}</Text>
               </View>
             </View>
           ))}
@@ -254,15 +258,15 @@ const InvoicePDF: React.FC<InvoicePDFProps> = ({ order }) => (
         <View style={styles.summaryDetails}>
             <View style={styles.summaryRow}>
                 <Text style={styles.summaryLabel}>Subtotal:</Text>
-                <Text style={styles.summaryValue}>₹{(order.subtotal || 0).toFixed(2)}</Text>
+                <Text style={styles.summaryValue}>₹{(order?.subtotal || 0).toFixed(2)}</Text>
             </View>
             <View style={styles.summaryRow}>
                 <Text style={styles.summaryLabel}>Shipping:</Text>
-                <Text style={styles.summaryValue}>₹{(order.shippingCost || 0).toFixed(2)}</Text>
+                <Text style={styles.summaryValue}>₹{(order?.shippingCost || 0).toFixed(2)}</Text>
             </View>
             <View style={styles.grandTotalRow}>
                 <Text style={styles.grandTotalLabel}>Grand Total:</Text>
-                <Text style={styles.grandTotalValue}>₹{(order.totalAmount || 0).toFixed(2)}</Text>
+                <Text style={styles.grandTotalValue}>₹{(order?.totalAmount || 0).toFixed(2)}</Text>
             </View>
         </View>
       </View>
@@ -275,3 +279,4 @@ const InvoicePDF: React.FC<InvoicePDFProps> = ({ order }) => (
 );
 
 export default InvoicePDF;
+
