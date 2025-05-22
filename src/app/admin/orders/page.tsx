@@ -21,6 +21,7 @@ import type { Order, ShippingAddress } from '@/types';
 import { format } from 'date-fns';
 import { ChevronLeft, ChevronRight, Search, PackageSearch, UserCircle, CalendarDays, FilterX } from 'lucide-react';
 import Link from 'next/link';
+import { cn } from '@/lib/utils'; // Added import for cn
 
 const ITEMS_PER_PAGE = 10;
 
@@ -300,4 +301,3 @@ export default function AdminOrdersPage() {
     </MainLayout>
   );
 }
-
