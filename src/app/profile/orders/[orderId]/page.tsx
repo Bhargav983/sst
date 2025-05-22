@@ -15,7 +15,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { cn } from '@/lib/utils';
 import html2pdf from 'html2pdf.js';
-import ReactDOM from 'react-dom';
+import { createRoot } from 'react-dom/client'; // Changed import
 import { InvoiceHTMLTemplate } from '@/components/invoice/invoice-html-template';
 
 
@@ -264,7 +264,7 @@ export default function UserOrderDetailPage() {
       document.body.appendChild(invoiceContainer);
     }
   
-    const root = ReactDOM.createRoot(invoiceContainer);
+    const root = createRoot(invoiceContainer); // Changed usage
     root.render(<InvoiceHTMLTemplate order={orderForPdf} />);
   
     // Give React a moment to render the component into the hidden div
@@ -493,3 +493,4 @@ export default function UserOrderDetailPage() {
     </MainLayout>
   );
 }
+
