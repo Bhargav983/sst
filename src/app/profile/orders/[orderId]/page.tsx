@@ -14,7 +14,10 @@ import { format } from 'date-fns';
 import Link from 'next/link';
 import Image from 'next/image';
 import { cn } from '@/lib/utils';
-import { useToast } from '@/hooks/use-toast';
+// Removed useToast as it's not directly used for PDFDownloadLink's primary UX
+import { PDFDownloadLink } from '@react-pdf/renderer';
+import InvoicePDF from '@/components/invoice/invoice-pdf';
+
 
 // Helper function to generate a fallback order if not found in localStorage
 const generateFallbackOrder = (orderId: string): Order => {
@@ -62,12 +65,14 @@ export default function UserOrderDetailPage() {
   const params = useParams();
   const orderId = params.orderId as string;
   const router = useRouter();
-  const { toast } = useToast();
+  // const { toast } = useToast(); // Removed as not directly used for PDFDownloadLink
 
   const [order, setOrder] = useState<Order | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isClient, setIsClient] = useState(false); // For conditional rendering of PDFDownloadLink
 
   useEffect(() => {
+    setIsClient(true); // Ensure PDFDownloadLink only renders on client
     if (!orderId) {
       setIsLoading(false);
       return;
@@ -107,52 +112,6 @@ export default function UserOrderDetailPage() {
     fetchOrder();
   }, [orderId]);
 
-  const handleDownloadInvoice = () => {
-    if (!order) return;
-
-    let invoiceContent = `SutraCart Invoice\n`;
-    invoiceContent += `------------------------------------\n`;
-    invoiceContent += `Order ID: ${order.id}\n`;
-    invoiceContent += `Order Date: ${format(new Date(order.createdAt), 'PPpp')}\n`;
-    invoiceContent += `Status: ${order.status}\n`;
-    invoiceContent += `Payment Status: ${order.paymentStatus}\n\n`;
-
-    invoiceContent += `Customer Information:\n`;
-    invoiceContent += `Name: ${order.customerInfo.fullName}\n`;
-    invoiceContent += `Email: ${order.customerInfo.email}\n`;
-    invoiceContent += `Phone: ${order.customerInfo.phone || 'N/A'}\n`;
-    invoiceContent += `Address: ${order.customerInfo.addressLine1}${order.customerInfo.addressLine2 ? `, ${order.customerInfo.addressLine2}` : ''}\n`;
-    invoiceContent += `         ${order.customerInfo.city}, ${order.customerInfo.state} - ${order.customerInfo.postalCode}\n`;
-    invoiceContent += `         ${order.customerInfo.country}\n\n`;
-
-    invoiceContent += `Items:\n`;
-    order.items.forEach(item => {
-      invoiceContent += `- ${item.name} (x${item.quantity}) - ${item.weight} @ ₹${item.price.toFixed(2)} each: ₹${(item.price * item.quantity).toFixed(2)}\n`;
-    });
-    invoiceContent += `\n`;
-
-    invoiceContent += `Subtotal: ₹${order.subtotal.toFixed(2)}\n`;
-    invoiceContent += `Shipping: ₹${order.shippingCost.toFixed(2)}\n`;
-    invoiceContent += `Total Amount: ₹${order.totalAmount.toFixed(2)}\n\n`;
-
-    invoiceContent += `Thank you for your order!\n`;
-    invoiceContent += `------------------------------------\n`;
-
-    const blob = new Blob([invoiceContent], { type: 'text/plain;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `invoice-${order.id}.txt`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
-
-    toast({
-      title: "Invoice Downloading",
-      description: `Invoice for order #${orderId} is being downloaded as a text file.`,
-    });
-  };
 
   const getStatusBadgeVariant = (status: Order['status'] | undefined) => {
     if (!status) return 'default';
@@ -178,7 +137,7 @@ export default function UserOrderDetailPage() {
     }
   };
 
-  if (isLoading) {
+  if (isLoading || !isClient) { // Also wait for isClient to be true
     return (
       <MainLayout>
         <div className="text-center py-20">
@@ -217,9 +176,20 @@ export default function UserOrderDetailPage() {
             <Button variant="outline" size="sm" onClick={() => router.push('/profile/orders')}>
               <ArrowLeft className="mr-2 h-4 w-4" /> Back to My Orders
             </Button>
-            <Button variant="outline" size="sm" onClick={handleDownloadInvoice}>
-              <Download className="mr-2 h-4 w-4" /> Download Invoice
-            </Button>
+            {isClient && order && ( // Ensure PDFDownloadLink is only rendered on the client and order is available
+              <PDFDownloadLink
+                document={<InvoicePDF order={order} />}
+                fileName={`invoice-${order.id}.pdf`}
+                style={{ textDecoration: 'none' }}
+              >
+                {({ loading }) => (
+                  <Button variant="outline" size="sm" disabled={loading}>
+                    <Download className="mr-2 h-4 w-4" />
+                    {loading ? 'Generating PDF...' : 'Download Invoice'}
+                  </Button>
+                )}
+              </PDFDownloadLink>
+            )}
           </div>
           <h1 className="text-2xl sm:text-3xl font-bold text-center sm:text-left mt-4 sm:mt-0">Order Details</h1>
           <Badge variant={getStatusBadgeVariant(order.status)} className={cn("text-sm self-center sm:self-auto", getStatusBadgeClass(order.status))}>
@@ -353,6 +323,3 @@ export default function UserOrderDetailPage() {
     </MainLayout>
   );
 }
-    
-
-    
