@@ -7,33 +7,41 @@ import React, { createContext, useContext, useState, ReactNode, useEffect } from
 interface AuthContextType {
   user: AppUser | null;
   loading: boolean;
-  login: (mockUser?: AppUser) => void;
+  login: (userToLogin: AppUser) => void; // Changed to accept full AppUser object
   logout: () => void;
-  // Add other auth functions like signUp, signInWithGoogle etc. later
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<AppUser | null>(null);
-  const [loading, setLoading] = useState(true); // Initially true to simulate loading
+  const [loading, setLoading] = useState(true); 
 
-  // Simulate fetching user state on mount
   useEffect(() => {
-    // In a real app, you'd check Firebase Auth state here
-    // For now, assume no user is logged in initially
+    // Simulate checking auth state on mount
+    // In a real app, this would involve Firebase Auth onAuthStateChanged listener
+    // And potentially fetching user data from localStorage or an API
+    const storedUser = localStorage.getItem('sutraCartUser');
+    if (storedUser) {
+      try {
+        setUser(JSON.parse(storedUser));
+      } catch (e) {
+        console.error("Failed to parse stored user", e);
+        localStorage.removeItem('sutraCartUser');
+      }
+    }
     setLoading(false);
   }, []);
 
-  const login = (mockUser?: AppUser) => {
-    // Simulate login
-    const defaultMockUser: AppUser = { uid: 'mock-user-uid', email: 'user@example.com', displayName: 'Mock User' };
-    setUser(mockUser || defaultMockUser);
+  const login = (userToLogin: AppUser) => {
+    setUser(userToLogin);
+    localStorage.setItem('sutraCartUser', JSON.stringify(userToLogin));
   };
 
   const logout = () => {
-    // Simulate logout
     setUser(null);
+    localStorage.removeItem('sutraCartUser');
+    // Also clear admin-specific things if any in future
   };
 
   return (
