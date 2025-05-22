@@ -2,10 +2,10 @@
 "use client";
 
 import Link from 'next/link';
-import { ShoppingBag, User, LogIn, LogOut, ChefHat, ShieldCheck, Settings, ListOrdered, Heart } from 'lucide-react'; // Added Heart
+import { ShoppingBag, User, LogIn, LogOut, ChefHat, ShieldCheck, Settings, ListOrdered, Heart, Home } from 'lucide-react'; // Added Home
 import { useCart } from '@/context/cart-context';
 import { useAuth } from '@/context/auth-provider';
-import { useWishlist } from '@/context/wishlist-context'; // Added useWishlist
+import { useWishlist } from '@/context/wishlist-context';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -18,9 +18,9 @@ import {
 } from "@/components/ui/dropdown-menu"
 
 export function Header() {
-  const { getCartItemCount, isCartReady: isCartContextReady } = useCart(); // Renamed for clarity
-  const { user, logout, loading: authLoading } = useAuth(); // Renamed for clarity
-  const { wishlistItems, isWishlistReady: isWishlistContextReady } = useWishlist(); // Renamed for clarity
+  const { getCartItemCount, isCartReady: isCartContextReady } = useCart();
+  const { user, logout, loading: authLoading, role } = useAuth(); // Added role
+  const { wishlistItems, isWishlistReady: isWishlistContextReady } = useWishlist();
 
   const isCartReady = isCartContextReady;
   const isWishlistReady = isWishlistContextReady;
@@ -36,8 +36,8 @@ export function Header() {
           <span className="text-xl font-bold text-primary">SutraCart</span>
         </Link>
         <nav className="flex items-center gap-4 md:gap-6">
-          <Link href="/" className="text-sm font-medium text-foreground/70 hover:text-foreground transition-colors">
-            Home
+          <Link href="/" className="text-sm font-medium text-foreground/70 hover:text-foreground transition-colors" aria-label="Home">
+            <Home className="h-5 w-5" />
           </Link>
           <Link href="/products" className="text-sm font-medium text-foreground/70 hover:text-foreground transition-colors">
             Products
@@ -98,6 +98,11 @@ export function Header() {
                   <Button variant="ghost" size="sm" className="text-sm font-medium flex items-center gap-1">
                     <User className="h-5 w-5" />
                     <span>{user.displayName || user.email?.split('@')[0]}</span>
+                     {user.role && user.role !== 'retail' && (
+                        <Badge variant="outline" className="ml-1 text-xs capitalize">
+                          {user.role}
+                        </Badge>
+                      )}
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
