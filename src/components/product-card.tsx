@@ -35,7 +35,7 @@ export function ProductCard({ product }: ProductCardProps) {
         </Link>
         <p className="text-sm text-muted-foreground mb-2">{product.description}</p>
         <div className="flex justify-between items-center">
-          <p className="text-lg font-bold text-primary">${product.price.toFixed(2)}</p>
+          <p className="text-lg font-bold text-primary">₹{product.price.toFixed(2)}</p>
           <p className="text-sm text-muted-foreground">{product.weight}</p>
         </div>
       </CardContent>

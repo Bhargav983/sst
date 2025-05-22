@@ -3,7 +3,8 @@
 
 import { MainLayout } from '@/components/layout/main-layout';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/context/auth-provider';
 import { ListOrdered, AlertCircle } from 'lucide-react';
 import Link from 'next/link';
@@ -77,7 +78,7 @@ export default function OrderHistoryPage() {
                 <CardContent>
                   <div className="flex justify-between items-center text-sm">
                     <span>Items: {order.items}</span>
-                    <span className="font-semibold">Total: ${order.total.toFixed(2)}</span>
+                    <span className="font-semibold">Total: ₹{order.total.toFixed(2)}</span>
                   </div>
                   {/* Later: Display items or link to order details */}
                 </CardContent>

@@ -71,7 +71,7 @@ export default function CartPage() {
               <div className="space-y-2">
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Subtotal</span>
-                  <span>${cartTotal.toFixed(2)}</span>
+                  <span>₹{cartTotal.toFixed(2)}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Shipping</span>
@@ -80,7 +80,7 @@ export default function CartPage() {
                 <Separator className="my-2" />
                 <div className="flex justify-between text-xl font-bold">
                   <span>Total</span>
-                  <span>${cartTotal.toFixed(2)}</span>
+                  <span>₹{cartTotal.toFixed(2)}</span>
                 </div>
               </div>
             </CardContent>

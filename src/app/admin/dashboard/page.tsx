@@ -26,7 +26,7 @@ export default function AdminDashboardPage() {
               <BarChart className="h-5 w-5 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">$15,231.89</div>
+              <div className="text-2xl font-bold">₹15,231.89</div>
               <p className="text-xs text-muted-foreground">+20.1% from last month</p>
             </CardContent>
           </Card>

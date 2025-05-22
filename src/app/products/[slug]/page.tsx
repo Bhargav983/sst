@@ -80,7 +80,7 @@ export default function ProductDetailPage() {
         
         <div className="flex flex-col justify-center">
           <h1 className="text-3xl lg:text-4xl font-bold text-primary mb-3">{product.name}</h1>
-          <p className="text-xl font-semibold text-foreground mb-3">${product.price.toFixed(2)}</p>
+          <p className="text-xl font-semibold text-foreground mb-3">₹{product.price.toFixed(2)}</p>
           <p className="text-md text-muted-foreground mb-1">Weight: {product.weight}</p>
           {product.category && <p className="text-sm text-accent mb-4">Category: {product.category}</p>}
           

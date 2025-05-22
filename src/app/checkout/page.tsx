@@ -55,7 +55,7 @@ export default function CheckoutPage() {
       city: '',
       state: '',
       postalCode: '',
-      country: 'USA', // Default country
+      country: 'India', // Default country
     },
   });
 
@@ -256,7 +256,7 @@ export default function CheckoutPage() {
                           <p className="text-xs text-muted-foreground">{item.weight}</p>
                         </div>
                       </div>
-                      <span>${(item.price * item.quantity).toFixed(2)}</span>
+                      <span>₹{(item.price * item.quantity).toFixed(2)}</span>
                     </div>
                   ))}
                 </div>
@@ -264,7 +264,7 @@ export default function CheckoutPage() {
                 <div className="space-y-1">
                   <div className="flex justify-between text-sm">
                     <span className="text-muted-foreground">Subtotal</span>
-                    <span>${cartTotal.toFixed(2)}</span>
+                    <span>₹{cartTotal.toFixed(2)}</span>
                   </div>
                   <div className="flex justify-between text-sm">
                     <span className="text-muted-foreground">Shipping</span>
@@ -273,7 +273,7 @@ export default function CheckoutPage() {
                   <Separator className="my-3" />
                   <div className="flex justify-between text-lg font-bold">
                     <span>Total</span>
-                    <span>${cartTotal.toFixed(2)}</span>
+                    <span>₹{cartTotal.toFixed(2)}</span>
                   </div>
                 </div>
               </CardContent>

@@ -37,7 +37,7 @@ export function CartItemDisplay({ item }: CartItemDisplayProps) {
           <h3 className="text-lg font-semibold hover:text-primary transition-colors">{item.name}</h3>
         </Link>
         <p className="text-sm text-muted-foreground">{item.weight}</p>
-        <p className="text-md font-medium text-primary my-1">${item.price.toFixed(2)}</p>
+        <p className="text-md font-medium text-primary my-1">₹{item.price.toFixed(2)}</p>
         <div className="mt-2">
           <QuantitySelector
             quantity={item.quantity}
@@ -46,7 +46,7 @@ export function CartItemDisplay({ item }: CartItemDisplayProps) {
         </div>
       </div>
       <div className="flex flex-col items-end justify-between h-full ml-auto">
-        <p className="text-lg font-semibold">${(item.price * item.quantity).toFixed(2)}</p>
+        <p className="text-lg font-semibold">₹{(item.price * item.quantity).toFixed(2)}</p>
         <Button
           variant="ghost"
           size="icon"

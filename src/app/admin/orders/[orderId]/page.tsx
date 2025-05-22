@@ -48,14 +48,14 @@ export default function AdminOrderDetailPage() {
                 <div key={item.id} className="flex justify-between items-center py-3 border-b last:border-b-0">
                   <div>
                     <p className="font-semibold">{item.name} (x{item.quantity})</p>
-                    <p className="text-sm text-muted-foreground">Price: ${item.price.toFixed(2)} each</p>
+                    <p className="text-sm text-muted-foreground">Price: ₹{item.price.toFixed(2)} each</p>
                   </div>
-                  <p className="font-semibold">${(item.price * item.quantity).toFixed(2)}</p>
+                  <p className="font-semibold">₹{(item.price * item.quantity).toFixed(2)}</p>
                 </div>
               ))}
               <Separator className="my-4" />
               <div className="flex justify-end items-center text-lg font-bold mt-2">
-                <DollarSign className="h-5 w-5 mr-1 text-muted-foreground" /> Total: ${mockOrder.totalAmount.toFixed(2)}
+                <DollarSign className="h-5 w-5 mr-1 text-muted-foreground" /> Total: ₹{mockOrder.totalAmount.toFixed(2)}
               </div>
             </CardContent>
           </Card>
