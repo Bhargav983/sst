@@ -14,8 +14,7 @@ import { format } from 'date-fns';
 import Link from 'next/link';
 import Image from 'next/image';
 import { cn } from '@/lib/utils';
-import { PDFDownloadLink, Page, Text, View, Document, StyleSheet as PdfStyles } from '@react-pdf/renderer';
-import InvoicePDF from '@/components/invoice/invoice-pdf';
+import { jsPDF } from 'jspdf';
 
 
 // Helper function to generate a fallback order if not found in localStorage
@@ -210,7 +209,7 @@ export default function UserOrderDetailPage() {
       
       const currentOrder = foundOrder || generateFallbackOrder(orderId);
       setOrder(currentOrder);
-      setOrderForPdf(getSafeOrderForPdf(currentOrder)); // Prepare sanitized version for PDF
+      setOrderForPdf(getSafeOrderForPdf(currentOrder)); 
       setIsLoading(false);
     };
 
@@ -242,6 +241,74 @@ export default function UserOrderDetailPage() {
     }
   };
 
+  const handleDownloadJsPdfInvoice = () => {
+    if (!orderForPdf) return;
+
+    const doc = new jsPDF();
+    const margin = 15;
+    let y = margin;
+
+    doc.setFontSize(18);
+    doc.text('SutraCart Invoice', margin, y);
+    y += 10;
+
+    doc.setFontSize(12);
+    doc.text(`Order ID: ${orderForPdf.id}`, margin, y);
+    y += 7;
+    doc.text(`Date: ${format(parseDateOrFallback(orderForPdf.createdAt), 'PP')}`, margin, y);
+    y += 7;
+    doc.text(`Customer: ${orderForPdf.customerInfo.fullName}`, margin, y);
+    y += 7;
+    doc.text(`Email: ${orderForPdf.customerInfo.email}`, margin, y);
+    y += 10;
+
+    doc.text('Shipping Address:', margin, y);
+    y += 7;
+    doc.text(orderForPdf.customerInfo.addressLine1, margin, y);
+    y += 7;
+    if (orderForPdf.customerInfo.addressLine2) {
+      doc.text(orderForPdf.customerInfo.addressLine2, margin, y);
+      y += 7;
+    }
+    doc.text(`${orderForPdf.customerInfo.city}, ${orderForPdf.customerInfo.state} - ${orderForPdf.customerInfo.postalCode}`, margin, y);
+    y += 7;
+    doc.text(orderForPdf.customerInfo.country, margin, y);
+    y += 10;
+
+    doc.setFontSize(14);
+    doc.text('Items:', margin, y);
+    y += 8;
+    doc.setFontSize(10);
+
+    (orderForPdf.items || []).forEach(item => {
+      if (y > 270) { // Simple page break logic
+        doc.addPage();
+        y = margin;
+      }
+      doc.text(`${item.name} (x${item.quantity}) - ${item.weight}`, margin, y);
+      doc.text(`₹${(item.price * item.quantity).toFixed(2)}`, 160, y, { align: 'right' });
+      y += 6;
+    });
+    y += 5;
+
+    doc.setFontSize(12);
+    doc.text(`Subtotal: ₹${orderForPdf.subtotal.toFixed(2)}`, 160, y, { align: 'right' });
+    y += 7;
+    doc.text(`Shipping: ₹${orderForPdf.shippingCost.toFixed(2)}`, 160, y, { align: 'right' });
+    y += 7;
+    doc.setFontSize(14);
+    doc.setFont('helvetica', 'bold');
+    doc.text(`Total: ₹${orderForPdf.totalAmount.toFixed(2)}`, 160, y, { align: 'right' });
+    doc.setFont('helvetica', 'normal');
+    y += 15;
+
+    doc.setFontSize(10);
+    doc.text('Thank you for your order!', margin, y);
+
+    doc.save(`invoice-${orderForPdf.id}.pdf`);
+  };
+
+
   if (isLoading || !isClient) {
     return (
       <MainLayout>
@@ -253,7 +320,7 @@ export default function UserOrderDetailPage() {
     );
   }
 
-  if (!order) { // Should ideally be covered by orderForPdf check for PDF link
+  if (!order) { 
     return (
       <MainLayout>
         <div className="flex flex-col items-center justify-center text-center py-20">
@@ -273,7 +340,7 @@ export default function UserOrderDetailPage() {
     );
   }
   
-  const canRenderPdfLink = isClient && orderForPdf && typeof orderForPdf.id === 'string' && orderForPdf.id && !orderForPdf.id.startsWith('emergency');
+  const canDownloadPdf = isClient && orderForPdf && typeof orderForPdf.id === 'string' && orderForPdf.id && !orderForPdf.id.startsWith('emergency');
 
   return (
     <MainLayout>
@@ -284,25 +351,15 @@ export default function UserOrderDetailPage() {
               <ArrowLeft className="mr-2 h-4 w-4" /> Back to My Orders
             </Button>
             
-            {canRenderPdfLink ? (
-              <PDFDownloadLink
-                document={<InvoicePDF order={orderForPdf} />} 
-                fileName={`invoice-${orderForPdf.id}.pdf`}
-                style={{ textDecoration: 'none' }}
-              >
-                {({ loading, error }) => ( // Add error to see if library reports anything
-                  <Button variant="outline" size="sm" disabled={loading}>
-                    <Download className="mr-2 h-4 w-4" />
-                    {loading ? 'Generating PDF...' : (error ? 'Error PDF' : 'Download Invoice')}
-                  </Button>
-                )}
-              </PDFDownloadLink>
-            ) : (
-                 <Button variant="outline" size="sm" disabled>
-                    <Download className="mr-2 h-4 w-4" />
-                    Invoice Unavailable
-                  </Button>
-            )}
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={handleDownloadJsPdfInvoice}
+              disabled={!canDownloadPdf}
+            >
+              <Download className="mr-2 h-4 w-4" />
+              {canDownloadPdf ? 'Download Invoice' : 'Invoice Unavailable'}
+            </Button>
           </div>
           <h1 className="text-2xl sm:text-3xl font-bold text-center sm:text-left mt-4 sm:mt-0">Order Details</h1>
           {order.status && 
