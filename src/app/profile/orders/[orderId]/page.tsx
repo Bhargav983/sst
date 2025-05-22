@@ -14,7 +14,7 @@ import { format } from 'date-fns';
 import Link from 'next/link';
 import Image from 'next/image';
 import { cn } from '@/lib/utils';
-import { PDFDownloadLink, Page, Text, View, Document, StyleSheet as PdfStyles } from '@react-pdf/renderer'; // Import necessary components
+import { PDFDownloadLink, Page, Text, View, Document, StyleSheet as PdfStyles } from '@react-pdf/renderer';
 import InvoicePDF from '@/components/invoice/invoice-pdf';
 
 
@@ -69,8 +69,6 @@ const parseDateOrFallback = (dateInput: any, fallbackDate: Date = new Date()): D
 // Creates a deeply sanitized version of the order for PDF generation
 const getSafeOrderForPdf = (currentOrder: Order | null): Order => {
     if (!currentOrder || typeof currentOrder.id !== 'string' || currentOrder.id === 'N/A') {
-        // If currentOrder is null or id is invalid, return a minimal fallback.
-        // PDFDownloadLink might still fail if it absolutely needs a valid-looking ID.
         return generateFallbackOrder('emergency-pdf-fallback-' + Date.now());
     }
 
@@ -91,7 +89,7 @@ const getSafeOrderForPdf = (currentOrder: Order | null): Order => {
         name: String(item?.name || 'Unknown Item'),
         price: Number(item?.price || 0),
         quantity: Number(item?.quantity || 1),
-        imageUrl: String(item?.imageUrl || 'https://placehold.co/80x80.png'), // imageUrl not used in PDF but good to sanitize
+        imageUrl: String(item?.imageUrl || 'https://placehold.co/80x80.png'),
         weight: String(item?.weight || 'N/A'),
     }));
 
@@ -118,10 +116,10 @@ const getSafeOrderForPdf = (currentOrder: Order | null): Order => {
     };
 };
 
-// Minimal styles for the static PDF test
+// Minimal styles for the static PDF test - REMOVED FONT FAMILY
 const minimalPdfStyles = PdfStyles.create({
   page: { padding: 30 },
-  text: { fontSize: 12, fontFamily: 'Helvetica' },
+  text: { fontSize: 12 },
 });
 
 const MinimalStaticPdfDocument = (
@@ -165,7 +163,7 @@ export default function UserOrderDetailPage() {
           try {
             const parsedData = JSON.parse(storedOrdersRaw);
             
-            if (Array.isArray(parsedData)) {
+            if (Array.isArray(parsedData)) { // Ensure parsedData is an array
               const allOrdersFromStorage: any[] = parsedData;
               
               const mappedOrders: Order[] = allOrdersFromStorage.map((o: any) => {
@@ -228,7 +226,7 @@ export default function UserOrderDetailPage() {
       
       const currentOrder = foundOrder || generateFallbackOrder(orderId);
       setOrder(currentOrder);
-      setOrderForPdf(getSafeOrderForPdf(currentOrder)); // Set the sanitized version for PDF
+      setOrderForPdf(getSafeOrderForPdf(currentOrder));
       setIsLoading(false);
     };
 
@@ -271,7 +269,7 @@ export default function UserOrderDetailPage() {
     );
   }
 
-  if (!order) { // order state might still be null initially or if fallback fails badly
+  if (!order) {
     return (
       <MainLayout>
         <div className="flex flex-col items-center justify-center text-center py-20">
@@ -291,8 +289,6 @@ export default function UserOrderDetailPage() {
     );
   }
   
-  // Ensure orderForPdf is set before trying to use it
-  // And ensure its id is valid for fileName
   const canRenderPdfLink = isClient && orderForPdf && typeof orderForPdf.id === 'string' && orderForPdf.id && !orderForPdf.id.startsWith('emergency');
 
 
@@ -306,7 +302,7 @@ export default function UserOrderDetailPage() {
             </Button>
             
             {/* DEBUGGING: Pass a minimal static document */}
-            {isClient && (
+            {isClient && ( // Only render PDFLink on client
               <PDFDownloadLink
                 document={MinimalStaticPdfDocument}
                 fileName={`static-invoice-debug.pdf`}
@@ -467,3 +463,5 @@ export default function UserOrderDetailPage() {
     </MainLayout>
   );
 }
+
+    

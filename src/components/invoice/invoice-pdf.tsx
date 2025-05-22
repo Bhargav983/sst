@@ -2,14 +2,13 @@
 "use client"; 
 
 import { Page, Text, Document, StyleSheet, View } from '@react-pdf/renderer';
-import type { Order } from '@/types'; // Keep for eventual restoration
+import type { Order } from '@/types';
 
-// Minimal styles for debugging
+// Minimal styles for debugging - REMOVED FONT FAMILY
 const styles = StyleSheet.create({
   page: {
     flexDirection: 'column',
     padding: 30,
-    fontFamily: 'Helvetica',
   },
   section: {
     margin: 10,
@@ -19,7 +18,6 @@ const styles = StyleSheet.create({
   heading: {
     fontSize: 18,
     marginBottom: 10,
-    fontFamily: 'Helvetica-Bold',
   },
   text: {
     fontSize: 12,
@@ -27,7 +25,7 @@ const styles = StyleSheet.create({
 });
 
 interface InvoicePDFProps {
-  order: Order | null; // Allow null for safety, though ideally it's always an order
+  order: Order | null;
 }
 
 // Hyper-simplified InvoicePDF for debugging
@@ -49,3 +47,5 @@ const InvoicePDF: React.FC<InvoicePDFProps> = ({ order }) => (
 );
 
 export default InvoicePDF;
+
+    
