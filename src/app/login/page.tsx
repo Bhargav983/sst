@@ -49,7 +49,7 @@ export default function LoginPage() {
     console.log("Login form submitted", data);
     
     // Simulate login:
-    login({ uid: 'mock-uid', email: data.email, displayName: data.email.split('@')[0] });
+    login({ uid: 'mock-uid', email: data.email, displayName: data.email.split('@')[0], role: 'retail' });
     toast({
         title: "Login Successful",
         description: "Welcome back!",
@@ -110,7 +110,7 @@ export default function LoginPage() {
                 Sign up
               </Link>
             </p>
-            <Link href="#" className="mt-2 text-muted-foreground hover:underline">
+            <Link href="/forgot-password" className="mt-2 text-muted-foreground hover:underline">
               Forgot password?
             </Link>
           </CardFooter>
