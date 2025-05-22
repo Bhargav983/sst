@@ -10,12 +10,13 @@ import type { Product, ProductImage, ProductVariant } from '@/types';
 import { Button } from '@/components/ui/button';
 import { useCart } from '@/context/cart-context';
 import { QuantitySelector } from '@/components/quantity-selector';
-import { AlertTriangle, ShoppingCart, Zap, Weight } from 'lucide-react';
+import { AlertTriangle, ShoppingCart, Zap, Weight, Heart } from 'lucide-react'; // Added Heart
 import { Card, CardContent } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
+import { useWishlist } from '@/context/wishlist-context'; // Added useWishlist
 
 const ZOOM_PANE_WIDTH = 400;
 const ZOOM_PANE_HEIGHT = 300;
@@ -34,6 +35,7 @@ export default function ProductDetailPage() {
   const [quantity, setQuantity] = useState(1);
   const { addToCart } = useCart();
   const { toast } = useToast();
+  const { addToWishlist, removeFromWishlist, isInWishlist, isWishlistReady } = useWishlist(); // Destructure wishlist hooks
 
   const [showZoom, setShowZoom] = useState(false);
   const [zoomCoords, setZoomCoords] = useState({ x: 0, y: 0 });
@@ -62,7 +64,6 @@ export default function ProductDetailPage() {
 
   const handleVariantChange = (variantSkuOrWeight: string) => {
     if (product && product.variants) {
-      // Assuming SKU is unique, otherwise match by weight. For simplicity, using weight.
       const newVariant = product.variants.find(v => v.weight === variantSkuOrWeight || v.sku === variantSkuOrWeight);
       if (newVariant) {
         setSelectedVariant(newVariant);
@@ -72,19 +73,16 @@ export default function ProductDetailPage() {
   
   const handleCartAction = (isBuyNow: boolean) => {
     if (product && selectedVariant) {
-      const cartProductImage = product.images[0]?.url || 'https://placehold.co/100x100.png';
       addToCart(
-        { // Constructing a temporary object that matches Product type for addToCart
+        { 
           ...product,
-          price: selectedVariant.price, // Use selected variant's price
-          weight: selectedVariant.weight, // Use selected variant's weight
-          // Ensure other Product fields are present if addToCart relies on them directly
-          // For now, variants and defaultVariantIndex are not used by addToCart's item creation
+          price: selectedVariant.price, 
+          weight: selectedVariant.weight, 
           variants: product.variants, 
           defaultVariantIndex: product.defaultVariantIndex,
         },
         quantity,
-        selectedVariant // Pass selected variant for clarity in cart context if needed, or for Sku
+        selectedVariant 
       );
       if (!isBuyNow) {
         toast({
@@ -94,6 +92,23 @@ export default function ProductDetailPage() {
       } else {
         router.push('/checkout');
       }
+    }
+  };
+
+  const handleWishlistToggle = () => {
+    if (!product || !isWishlistReady) return;
+    if (isInWishlist(product.id)) {
+      removeFromWishlist(product.id);
+      toast({
+        title: "Removed from Wishlist",
+        description: `${product.name} has been removed from your wishlist.`,
+      });
+    } else {
+      addToWishlist(product.id);
+      toast({
+        title: "Added to Wishlist",
+        description: `${product.name} has been added to your wishlist.`,
+      });
     }
   };
 
@@ -128,6 +143,7 @@ export default function ProductDetailPage() {
   }
   
   const validSelectedImageUrl = selectedImage?.url;
+  const isProductInWishlist = isWishlistReady && product ? isInWishlist(product.id) : false;
 
   return (
     <MainLayout>
@@ -209,7 +225,6 @@ export default function ProductDetailPage() {
             {selectedVariant.pricePerUnit && <p className="text-sm text-muted-foreground">{selectedVariant.pricePerUnit}</p>}
           </div>
 
-          {/* Variant Selection */}
           {product.variants.length > 1 && (
             <Card className="mb-6 shadow rounded-lg">
               <CardContent className="p-4">
@@ -238,7 +253,7 @@ export default function ProductDetailPage() {
               </CardContent>
             </Card>
           )}
-          {!product.variants.length && (
+          {!product.variants.length && selectedVariant.weight && (
              <p className="text-md text-muted-foreground mb-1">Weight: {selectedVariant.weight}</p>
           )}
           
@@ -254,12 +269,22 @@ export default function ProductDetailPage() {
           <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 mb-4">
             <QuantitySelector quantity={quantity} onQuantityChange={setQuantity} />
           </div>
-          <div className="flex flex-col sm:flex-row items-center gap-3">
-             <Button size="lg" onClick={() => handleCartAction(false)} className="w-full sm:w-auto shadow-md flex-1 sm:flex-none">
+          <div className="flex flex-col sm:flex-row items-stretch gap-3">
+             <Button size="lg" onClick={() => handleCartAction(false)} className="w-full sm:w-auto shadow-md flex-1">
               <ShoppingCart className="mr-2 h-5 w-5" /> Add to Cart
             </Button>
-            <Button size="lg" onClick={() => handleCartAction(true)} variant="default" className="w-full sm:w-auto shadow-md flex-1 sm:flex-none bg-accent hover:bg-accent/90 text-accent-foreground">
+            <Button size="lg" onClick={() => handleCartAction(true)} variant="default" className="w-full sm:w-auto shadow-md flex-1 bg-accent hover:bg-accent/90 text-accent-foreground">
               <Zap className="mr-2 h-5 w-5" /> Buy Now
+            </Button>
+            <Button 
+              variant="outline" 
+              size="lg" 
+              onClick={handleWishlistToggle} 
+              className="w-full sm:w-auto shadow-md flex-grow-0 sm:flex-grow-0" // Adjusted flex properties
+              aria-label={isProductInWishlist ? "Remove from Wishlist" : "Add to Wishlist"}
+              disabled={!isWishlistReady}
+            >
+              <Heart className={cn("h-5 w-5", isProductInWishlist ? "fill-destructive text-destructive" : "text-muted-foreground")} />
             </Button>
           </div>
         </div>
