@@ -116,19 +116,12 @@ const getSafeOrderForPdf = (currentOrder: Order | null): Order => {
     };
 };
 
-// Minimal styles for the static PDF test - REMOVED FONT FAMILY
-const minimalPdfStyles = PdfStyles.create({
-  page: { padding: 30 },
-  text: { fontSize: 12 },
-});
 
-const MinimalStaticPdfDocument = (
+// Hyper minimal document for testing PDFDownloadLink
+const BareMinimumPdfDocument = () => (
   <Document>
-    <Page size="A4" style={minimalPdfStyles.page}>
-      <View>
-        <Text style={minimalPdfStyles.text}>Static Test PDF Document</Text>
-        <Text style={minimalPdfStyles.text}>If this downloads, the issue is with InvoicePDF or its data.</Text>
-      </View>
+    <Page size="A4">
+      <Text>Test</Text>
     </Page>
   </Document>
 );
@@ -163,7 +156,7 @@ export default function UserOrderDetailPage() {
           try {
             const parsedData = JSON.parse(storedOrdersRaw);
             
-            if (Array.isArray(parsedData)) { // Ensure parsedData is an array
+            if (Array.isArray(parsedData)) { 
               const allOrdersFromStorage: any[] = parsedData;
               
               const mappedOrders: Order[] = allOrdersFromStorage.map((o: any) => {
@@ -301,17 +294,16 @@ export default function UserOrderDetailPage() {
               <ArrowLeft className="mr-2 h-4 w-4" /> Back to My Orders
             </Button>
             
-            {/* DEBUGGING: Pass a minimal static document */}
+            {/* DEBUGGING: Pass a hyper minimal static document */}
             {isClient && ( // Only render PDFLink on client
               <PDFDownloadLink
-                document={MinimalStaticPdfDocument}
-                fileName={`static-invoice-debug.pdf`}
-                style={{ textDecoration: 'none' }}
+                document={<BareMinimumPdfDocument />}
+                fileName={`bare-minimum-debug.pdf`}
               >
                 {({ loading }) => (
                   <Button variant="outline" size="sm" disabled={loading}>
                     <Download className="mr-2 h-4 w-4" />
-                    {loading ? 'Generating Static PDF...' : 'Download Static PDF'}
+                    {loading ? 'Generating Bare Min PDF...' : 'Download Bare Min PDF'}
                   </Button>
                 )}
               </PDFDownloadLink>
@@ -463,5 +455,7 @@ export default function UserOrderDetailPage() {
     </MainLayout>
   );
 }
+
+    
 
     
