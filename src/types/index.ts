@@ -12,23 +12,24 @@ export interface Product {
   longDescription?: string;
   price: number;
   weight: string;
-  images: ProductImage[]; // Changed from imageUrl to images array
-  category?: string; // Optional, e.g., "Spicy", "Mild"
-  // dataAiHint is now part of ProductImage
+  images: ProductImage[];
+  category?: string;
 }
 
 export interface CartItem {
-  id: string; // Product ID
+  id: string;
   name: string;
   price: number;
   quantity: number;
-  imageUrl: string; // Keep for cart, can use product.images[0].url
+  imageUrl: string;
   weight: string;
 }
 
 export interface ShippingAddress {
+  id?: string; // Made optional for new addresses, will be assigned when saved
+  label?: string; // e.g., "Home", "Work"
   fullName: string;
-  email: string;
+  email: string; // Kept for guest checkout or if primary email differs
   phone: string;
   addressLine1: string;
   addressLine2?: string;
@@ -41,30 +42,30 @@ export interface ShippingAddress {
 export interface StatusHistoryEntry {
   status: Order['status'];
   timestamp: Date;
-  notes?: string; // Optional for admin to add notes
+  notes?: string;
 }
 
 export interface Order {
-  id: string; // Firestore document ID
-  userId?: string; // For registered users
-  customerInfo: ShippingAddress; // Includes email for guests
-  items: CartItem[]; // In a real app, this might be just item IDs and quantities
-  itemSummary?: string; // Short summary like "Andhra Chilli Paste x2, ..."
+  id: string;
+  userId?: string;
+  customerInfo: ShippingAddress;
+  items: CartItem[];
+  itemSummary?: string;
   subtotal: number;
   shippingCost: number;
   totalAmount: number;
   status: 'Pending' | 'Processing' | 'Shipped' | 'Delivered' | 'Cancelled';
   paymentStatus: 'Pending' | 'Paid' | 'Failed';
-  createdAt: Date; // Or Firestore Timestamp
-  updatedAt: Date; // Or Firestore Timestamp
-  statusHistory?: StatusHistoryEntry[]; // New field for chronological status changes
+  createdAt: Date;
+  updatedAt: Date;
+  statusHistory?: StatusHistoryEntry[];
 }
 
-// For AuthContext, basic user type
 export interface AppUser {
   uid: string;
   email: string | null;
   displayName?: string | null;
-  phone?: string | null; // Added phone field
-  isAdmin?: boolean; // Added for admin distinction
+  phone?: string | null;
+  isAdmin?: boolean;
+  addresses?: ShippingAddress[]; // Array of saved addresses
 }

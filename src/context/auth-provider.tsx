@@ -1,29 +1,33 @@
 
 "use client";
 
-import type { AppUser } from '@/types';
+import type { AppUser, ShippingAddress } from '@/types';
 import React, { createContext, useContext, useState, ReactNode, useEffect } from 'react';
 
 interface AuthContextType {
   user: AppUser | null;
   loading: boolean;
-  login: (userToLogin: AppUser) => void; 
+  login: (userToLogin: AppUser) => void;
   logout: () => void;
+  addAddress: (newAddress: Omit<ShippingAddress, 'id'> & { label: string }) => void;
+  // Future: updateAddress, deleteAddress
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<AppUser | null>(null);
-  const [loading, setLoading] = useState(true); 
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Simulate checking auth state on mount
     const storedUser = localStorage.getItem('sutraCartUser');
     if (storedUser) {
       try {
         const parsedUser: AppUser = JSON.parse(storedUser);
-        setUser(parsedUser);
+        setUser({
+          ...parsedUser,
+          addresses: parsedUser.addresses || [] // Ensure addresses is always an array
+        });
       } catch (e) {
         console.error("Failed to parse stored user", e);
         localStorage.removeItem('sutraCartUser');
@@ -33,13 +37,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   const login = (userToLogin: AppUser) => {
-    // Ensure all expected fields are present, even if optional in AppUser type for general use
     const completeUser: AppUser = {
         uid: userToLogin.uid,
         email: userToLogin.email,
         displayName: userToLogin.displayName || null,
         phone: userToLogin.phone || null,
         isAdmin: userToLogin.isAdmin || false,
+        addresses: userToLogin.addresses || [], // Initialize addresses
     };
     setUser(completeUser);
     localStorage.setItem('sutraCartUser', JSON.stringify(completeUser));
@@ -48,10 +52,27 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const logout = () => {
     setUser(null);
     localStorage.removeItem('sutraCartUser');
+    // Optionally clear other user-specific data from localStorage if needed
+  };
+
+  const addAddress = (newAddressData: Omit<ShippingAddress, 'id'> & { label: string }) => {
+    setUser(currentUser => {
+      if (!currentUser) return null;
+      const newAddressWithId: ShippingAddress = {
+        ...newAddressData,
+        id: `addr_${Date.now().toString()}` // Simple unique ID
+      };
+      const updatedUser = {
+        ...currentUser,
+        addresses: [...(currentUser.addresses || []), newAddressWithId],
+      };
+      localStorage.setItem('sutraCartUser', JSON.stringify(updatedUser));
+      return updatedUser;
+    });
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, logout }}>
+    <AuthContext.Provider value={{ user, loading, login, logout, addAddress }}>
       {children}
     </AuthContext.Provider>
   );
