@@ -20,18 +20,17 @@ import InvoicePDF from '@/components/invoice/invoice-pdf';
 
 // Helper function to generate a fallback order if not found in localStorage
 const generateFallbackOrder = (orderId: string): Order => {
-  const createdAt = new Date(Date.now() - Math.floor(Math.random() * 10) * 24 * 60 * 60 * 1000);
+  const createdAt = new Date(); // Use current date for simplicity in fallback
   const items: CartItem[] = [
-    { id: 'prod1-fallback', name: 'Fallback Paste A', quantity: 1, price: 10.00, imageUrl: 'https://placehold.co/80x80.png', weight: '150g' },
-    { id: 'prod2-fallback', name: 'Fallback Paste B', quantity: 2, price: 8.50, imageUrl: 'https://placehold.co/80x80.png', weight: '100g' },
+    { id: 'prod1-fallback', name: 'Fallback Paste A', quantity: 1, price: 10.00, imageUrl: 'https://placehold.co/80x80.png', dataAiHint: 'product item', weight: '150g' },
+    { id: 'prod2-fallback', name: 'Fallback Paste B', quantity: 2, price: 8.50, imageUrl: 'https://placehold.co/80x80.png', dataAiHint: 'product item', weight: '100g' },
   ];
   const subtotal = items.reduce((sum, item) => sum + item.price * item.quantity, 0);
   const shippingCost = 5.00;
 
   const statusHistory: StatusHistoryEntry[] = [
-    { status: 'Pending', timestamp: new Date(createdAt.getTime() - 3600000 * 2) }, // 2 hours before creation
+    { status: 'Pending', timestamp: new Date(createdAt.getTime() - 3600000 * 2) },
     { status: 'Processing', timestamp: createdAt },
-    { status: 'Shipped', timestamp: new Date(createdAt.getTime() + 3600000 * 24 * 2) }, // 2 days after
   ];
   
   return {
@@ -52,13 +51,69 @@ const generateFallbackOrder = (orderId: string): Order => {
     subtotal,
     shippingCost,
     totalAmount: subtotal + shippingCost,
-    status: 'Shipped',
+    status: 'Processing',
     paymentStatus: 'Paid',
     createdAt,
     updatedAt: statusHistory[statusHistory.length -1].timestamp,
     statusHistory,
     userId: 'fallback-user-id',
   };
+};
+
+const parseDateOrFallback = (dateInput: any, fallbackDate: Date = new Date()): Date => {
+    if (!dateInput) return fallbackDate;
+    const date = new Date(dateInput);
+    return isNaN(date.getTime()) ? fallbackDate : date;
+};
+
+// Creates a deeply sanitized version of the order for PDF generation
+const getSafeOrderForPdf = (currentOrder: Order | null): Order => {
+    if (!currentOrder || typeof currentOrder.id !== 'string' || currentOrder.id === 'N/A') {
+        return generateFallbackOrder('emergency-pdf-fallback');
+    }
+
+    const safeCustomerInfo: ShippingAddress = {
+        fullName: String(currentOrder.customerInfo?.fullName || 'N/A'),
+        email: String(currentOrder.customerInfo?.email || 'N/A'),
+        phone: String(currentOrder.customerInfo?.phone || 'N/A'),
+        addressLine1: String(currentOrder.customerInfo?.addressLine1 || 'N/A'),
+        addressLine2: String(currentOrder.customerInfo?.addressLine2 || ''),
+        city: String(currentOrder.customerInfo?.city || 'N/A'),
+        state: String(currentOrder.customerInfo?.state || 'N/A'),
+        postalCode: String(currentOrder.customerInfo?.postalCode || 'N/A'),
+        country: String(currentOrder.customerInfo?.country || 'India'),
+    };
+    
+    const safeItems: CartItem[] = (Array.isArray(currentOrder.items) ? currentOrder.items : []).map(item => ({
+        id: String(item?.id || `item-${Math.random()}`),
+        name: String(item?.name || 'Unknown Item'),
+        price: Number(item?.price || 0),
+        quantity: Number(item?.quantity || 1),
+        imageUrl: String(item?.imageUrl || 'https://placehold.co/80x80.png'),
+        weight: String(item?.weight || 'N/A'),
+    }));
+
+    const safeStatusHistory: StatusHistoryEntry[] = (Array.isArray(currentOrder.statusHistory) ? currentOrder.statusHistory : []).map(sh => ({
+        status: sh?.status || 'Pending',
+        timestamp: parseDateOrFallback(sh?.timestamp),
+        notes: String(sh?.notes || ''),
+    }));
+
+    return {
+        id: String(currentOrder.id), // Already checked it's a valid string
+        customerInfo: safeCustomerInfo,
+        items: safeItems,
+        subtotal: Number(currentOrder.subtotal || 0),
+        shippingCost: Number(currentOrder.shippingCost || 0),
+        totalAmount: Number(currentOrder.totalAmount || 0),
+        status: currentOrder.status || 'Pending',
+        paymentStatus: currentOrder.paymentStatus || 'Pending',
+        createdAt: parseDateOrFallback(currentOrder.createdAt),
+        updatedAt: parseDateOrFallback(currentOrder.updatedAt, parseDateOrFallback(currentOrder.createdAt)),
+        statusHistory: safeStatusHistory,
+        itemSummary: String(currentOrder.itemSummary || safeItems.map(i => `${i.name} (x${i.quantity})`).join(', ')),
+        userId: String(currentOrder.userId || ''),
+    };
 };
 
 
@@ -72,7 +127,7 @@ export default function UserOrderDetailPage() {
   const [isClient, setIsClient] = useState(false);
 
   useEffect(() => {
-    setIsClient(true);
+    setIsClient(true); // Indicates component has mounted and can access browser APIs
     if (!orderId) {
       setIsLoading(false);
       return;
@@ -80,6 +135,7 @@ export default function UserOrderDetailPage() {
 
     const fetchOrder = async () => {
       setIsLoading(true);
+      // Simulate API delay
       await new Promise(resolve => setTimeout(resolve, 300)); 
 
       let foundOrder: Order | undefined;
@@ -93,6 +149,12 @@ export default function UserOrderDetailPage() {
               const allOrdersFromStorage: any[] = parsedData;
               
               const mappedOrders: Order[] = allOrdersFromStorage.map((o: any) => {
+                // Basic validation for 'o'
+                if (!o || typeof o !== 'object') {
+                  // Return a minimal structure or skip
+                  return generateFallbackOrder(`malformed-entry-${Math.random()}`); 
+                }
+
                 const customerInfo: ShippingAddress = {
                   fullName: String(o?.customerInfo?.fullName || 'N/A'),
                   email: String(o?.customerInfo?.email || 'N/A'),
@@ -102,7 +164,7 @@ export default function UserOrderDetailPage() {
                   city: String(o?.customerInfo?.city || 'N/A'),
                   state: String(o?.customerInfo?.state || 'N/A'),
                   postalCode: String(o?.customerInfo?.postalCode || 'N/A'),
-                  country: String(o?.customerInfo?.country || 'India'), // Default to India
+                  country: String(o?.customerInfo?.country || 'India'),
                 };
 
                 const items: CartItem[] = (Array.isArray(o?.items) ? o.items : []).map((it: any) => ({
@@ -116,7 +178,7 @@ export default function UserOrderDetailPage() {
 
                 const statusHistory: StatusHistoryEntry[] = (Array.isArray(o?.statusHistory) ? o.statusHistory : []).map((sh: any) => ({
                   status: sh?.status || 'Pending',
-                  timestamp: new Date(sh?.timestamp || Date.now()),
+                  timestamp: parseDateOrFallback(sh?.timestamp),
                   notes: sh?.notes,
                 }));
                 
@@ -129,8 +191,8 @@ export default function UserOrderDetailPage() {
                   totalAmount: Number(o?.totalAmount || 0),
                   status: o?.status || 'Pending',
                   paymentStatus: o?.paymentStatus || 'Pending',
-                  createdAt: new Date(o?.createdAt || Date.now()),
-                  updatedAt: new Date(o?.updatedAt || Date.now()),
+                  createdAt: parseDateOrFallback(o?.createdAt),
+                  updatedAt: parseDateOrFallback(o?.updatedAt, parseDateOrFallback(o?.createdAt)),
                   statusHistory,
                   itemSummary: String(o?.itemSummary || items.map(item => `${item.name} (x${item.quantity})`).join(', ')),
                   userId: String(o?.userId || ''),
@@ -213,6 +275,11 @@ export default function UserOrderDetailPage() {
       </MainLayout>
     );
   }
+  
+  // Prepare safe order for PDF rendering
+  // This variable is only created when `order` is confirmed to be non-null.
+  const orderForPdf = getSafeOrderForPdf(order);
+
 
   return (
     <MainLayout>
@@ -222,10 +289,10 @@ export default function UserOrderDetailPage() {
             <Button variant="outline" size="sm" onClick={() => router.push('/profile/orders')}>
               <ArrowLeft className="mr-2 h-4 w-4" /> Back to My Orders
             </Button>
-            {isClient && order && typeof order.id === 'string' && order.id !== 'N/A' && (
+            {isClient && orderForPdf && ( // Use orderForPdf here for condition and props
               <PDFDownloadLink
-                document={<InvoicePDF order={order} />}
-                fileName={`invoice-${order.id}.pdf`}
+                document={<InvoicePDF order={orderForPdf} />}
+                fileName={`invoice-${orderForPdf.id}.pdf`}
                 style={{ textDecoration: 'none' }}
               >
                 {({ loading }) => (
@@ -248,11 +315,11 @@ export default function UserOrderDetailPage() {
             <CardTitle className="flex items-center justify-between">
                 <span>Order ID: #{order.id}</span>
                 <span className="text-sm font-normal text-muted-foreground">
-                    Placed on: {order.createdAt ? format(new Date(order.createdAt), 'PPpp') : 'N/A'}
+                    Placed on: {order.createdAt ? format(parseDateOrFallback(order.createdAt), 'PPpp') : 'N/A'}
                 </span>
             </CardTitle>
             <CardDescription>
-                Last updated: {order.updatedAt ? format(new Date(order.updatedAt), 'PPpp') : 'N/A'}
+                Last updated: {order.updatedAt ? format(parseDateOrFallback(order.updatedAt), 'PPpp') : 'N/A'}
             </CardDescription>
           </CardHeader>
         </Card>
@@ -269,9 +336,9 @@ export default function UserOrderDetailPage() {
                   <div className="flex-grow">
                     <p className="font-semibold">{item.name}</p>
                     <p className="text-sm text-muted-foreground">Qty: {item.quantity} &bull; {item.weight}</p>
-                    <p className="text-sm text-muted-foreground">Price: ₹{item.price.toFixed(2)} each</p>
+                    <p className="text-sm text-muted-foreground">Price: ₹{Number(item.price).toFixed(2)} each</p>
                   </div>
-                  <p className="font-semibold text-md">₹{(item.price * item.quantity).toFixed(2)}</p>
+                  <p className="font-semibold text-md">₹{(Number(item.price) * Number(item.quantity)).toFixed(2)}</p>
                 </div>
               ))}
             </CardContent>
@@ -279,16 +346,16 @@ export default function UserOrderDetailPage() {
                 <div className="w-full space-y-2 text-right">
                     <div className="flex justify-between items-center text-md">
                         <span className="text-muted-foreground">Subtotal:</span>
-                        <span className="font-semibold">₹{order.subtotal.toFixed(2)}</span>
+                        <span className="font-semibold">₹{Number(order.subtotal).toFixed(2)}</span>
                     </div>
                     <div className="flex justify-between items-center text-md">
                         <span className="text-muted-foreground">Shipping:</span>
-                        <span className="font-semibold">₹{order.shippingCost.toFixed(2)}</span>
+                        <span className="font-semibold">₹{Number(order.shippingCost).toFixed(2)}</span>
                     </div>
                     <Separator className="my-2" />
                     <div className="flex justify-between items-center text-xl font-bold">
                         <span>Total:</span>
-                        <span>₹{order.totalAmount.toFixed(2)}</span>
+                        <span>₹{Number(order.totalAmount).toFixed(2)}</span>
                     </div>
                 </div>
             </CardFooter>
@@ -310,7 +377,7 @@ export default function UserOrderDetailPage() {
                 </p>
                  <p>
                     <span className="text-muted-foreground">Phone:</span> {order.customerInfo.phone || 'N/A'}
-                </p>
+                 </p>
               </CardContent>
             </Card>
             
@@ -350,7 +417,7 @@ export default function UserOrderDetailPage() {
                                             {entry.status}
                                         </Badge>
                                         <span className="text-xs text-muted-foreground">
-                                            {entry.timestamp ? format(new Date(entry.timestamp), 'dd MMM yyyy, HH:mm') : 'N/A'}
+                                            {entry.timestamp ? format(parseDateOrFallback(entry.timestamp), 'dd MMM yyyy, HH:mm') : 'N/A'}
                                         </span>
                                     </div>
                                     {entry.notes && <p className="text-xs text-muted-foreground italic mt-1">({entry.notes})</p>}
