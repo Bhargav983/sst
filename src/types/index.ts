@@ -1,4 +1,9 @@
 
+export interface ProductImage {
+  url: string;
+  dataAiHint?: string;
+}
+
 export interface Product {
   id: string;
   name: string;
@@ -7,9 +12,9 @@ export interface Product {
   longDescription?: string;
   price: number;
   weight: string;
-  imageUrl: string;
+  images: ProductImage[]; // Changed from imageUrl to images array
   category?: string; // Optional, e.g., "Spicy", "Mild"
-  dataAiHint?: string; // For placeholder image generation
+  // dataAiHint is now part of ProductImage
 }
 
 export interface CartItem {
@@ -17,7 +22,7 @@ export interface CartItem {
   name: string;
   price: number;
   quantity: number;
-  imageUrl: string;
+  imageUrl: string; // Keep for cart, can use product.images[0].url
   weight: string;
 }
 
@@ -63,4 +68,3 @@ export interface AppUser {
   phone?: string | null; // Added phone field
   isAdmin?: boolean; // Added for admin distinction
 }
-

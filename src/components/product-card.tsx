@@ -1,14 +1,14 @@
 
-"use client"; // Converted to client component
+"use client"; 
 
 import Link from 'next/link';
 import Image from 'next/image';
 import type { Product } from '@/types';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { ArrowRight, ShoppingCart } from 'lucide-react'; // Added ShoppingCart
-import { useCart } from '@/context/cart-context'; // Added for cart functionality
-import { useToast } from '@/hooks/use-toast'; // Added for notifications
+import { ArrowRight, ShoppingCart } from 'lucide-react'; 
+import { useCart } from '@/context/cart-context'; 
+import { useToast } from '@/hooks/use-toast'; 
 
 interface ProductCardProps {
   product: Product;
@@ -18,8 +18,15 @@ export function ProductCard({ product }: ProductCardProps) {
   const { addToCart } = useCart();
   const { toast } = useToast();
 
+  const firstImage = product.images && product.images.length > 0 
+    ? product.images[0] 
+    : { url: 'https://placehold.co/600x400.png', dataAiHint: 'placeholder product' };
+
   const handleAddToCart = () => {
-    addToCart(product, 1); // Add 1 unit of the product
+    addToCart(
+      { ...product, imageUrl: firstImage.url }, // Ensure CartItem gets an imageUrl
+      1
+    ); 
     toast({
       title: "Added to cart!",
       description: `${product.name} (x1) has been added to your cart.`,
@@ -32,28 +39,28 @@ export function ProductCard({ product }: ProductCardProps) {
         <Link href={`/products/${product.slug}`} legacyBehavior passHref>
           <a className="block aspect-[4/3] relative overflow-hidden group">
             <Image
-              src={product.imageUrl}
+              src={firstImage.url}
               alt={product.name}
               layout="fill"
               objectFit="cover"
               className="transition-transform duration-300 group-hover:scale-105"
-              data-ai-hint={product.dataAiHint || 'spice product'}
+              data-ai-hint={firstImage.dataAiHint || 'spice product'}
             />
           </a>
         </Link>
       </CardHeader>
-      <CardContent className="p-4 flex flex-col flex-grow"> {/* Make CardContent a flex column and grow */}
-        <div className="flex-grow"> {/* Wrapper for top content that should take available space */}
+      <CardContent className="p-4 flex flex-col flex-grow"> 
+        <div className="flex-grow"> 
           <Link href={`/products/${product.slug}`} legacyBehavior passHref>
             <a>
               <CardTitle className="text-lg font-semibold mb-1 hover:text-primary transition-colors line-clamp-2">{product.name}</CardTitle>
             </a>
           </Link>
-          <p className="text-sm text-muted-foreground mb-1">{product.weight}</p> {/* Weight displayed below name */}
-          <p className="text-sm text-muted-foreground mb-2 line-clamp-3">{product.description}</p> {/* Description with line clamping */}
+          <p className="text-sm text-muted-foreground mb-1">{product.weight}</p> 
+          <p className="text-sm text-muted-foreground mb-2 line-clamp-3">{product.description}</p>
         </div>
         
-        <div className="mt-auto pt-2 flex justify-between items-center"> {/* This div is pushed to the bottom */}
+        <div className="mt-auto pt-2 flex justify-between items-center"> 
           <p className="text-lg font-bold text-primary">₹{product.price.toFixed(2)}</p>
           <Button variant="outline" size="sm" onClick={handleAddToCart}>
             <ShoppingCart className="mr-2 h-4 w-4" />

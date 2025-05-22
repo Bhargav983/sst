@@ -1,3 +1,4 @@
+
 import type { Product } from '@/types';
 
 export const products: Product[] = [
@@ -9,8 +10,13 @@ export const products: Product[] = [
     longDescription: 'Experience the authentic taste of Andhra Pradesh with our Chilli Paste. Made from sun-dried Guntur chillies and a secret blend of spices, this paste is perfect for adding a spicy kick to your curries, stir-fries, or as a marinade. Its robust flavor and vibrant color will elevate any dish.',
     price: 12.99,
     weight: '250g',
-    imageUrl: 'https://placehold.co/600x400.png',
-    dataAiHint: 'chilli paste',
+    images: [
+      { url: 'https://placehold.co/600x400.png', dataAiHint: 'chilli paste main' },
+      { url: 'https://placehold.co/600x400.png', dataAiHint: 'chilli paste closeup' },
+      { url: 'https://placehold.co/600x400.png', dataAiHint: 'chilli paste ingredients' },
+      { url: 'https://placehold.co/600x400.png', dataAiHint: 'chilli paste texture' },
+      { url: 'https://placehold.co/600x400.png', dataAiHint: 'chilli paste jar' }
+    ],
     category: 'Spicy',
   },
   {
@@ -21,8 +27,13 @@ export const products: Product[] = [
     longDescription: 'Our Kerala Coconut Curry Paste brings the taste of the Malabar coast to your kitchen. A harmonious blend of freshly grated coconut, ginger, garlic, and fragrant spices like cardamom and cloves. Ideal for creating authentic fish curries, vegetable stews, or chicken preparations.',
     price: 14.50,
     weight: '250g',
-    imageUrl: 'https://placehold.co/600x400.png',
-    dataAiHint: 'coconut curry',
+    images: [
+      { url: 'https://placehold.co/600x400.png', dataAiHint: 'coconut curry main' },
+      { url: 'https://placehold.co/600x400.png', dataAiHint: 'coconut curry closeup' },
+      { url: 'https://placehold.co/600x400.png', dataAiHint: 'coconut curry ingredients' },
+      { url: 'https://placehold.co/600x400.png', dataAiHint: 'coconut curry texture' },
+      { url: 'https://placehold.co/600x400.png', dataAiHint: 'coconut curry dish' }
+    ],
     category: 'Mild',
   },
   {
@@ -33,8 +44,13 @@ export const products: Product[] = [
     longDescription: 'Discover the unique tangy flavor of South Indian cuisine with our Tamilian Tamarind Paste. Made from pure tamarind pulp and blended with traditional spices, it adds depth and complexity to sambar, rasam, and various gravies. A versatile ingredient for authentic Tamil flavors.',
     price: 10.99,
     weight: '200g',
-    imageUrl: 'https://placehold.co/600x400.png',
-    dataAiHint: 'tamarind paste',
+    images: [
+      { url: 'https://placehold.co/600x400.png', dataAiHint: 'tamarind paste main' },
+      { url: 'https://placehold.co/600x400.png', dataAiHint: 'tamarind paste closeup' },
+      { url: 'https://placehold.co/600x400.png', dataAiHint: 'tamarind fruit' },
+      { url: 'https://placehold.co/600x400.png', dataAiHint: 'tamarind paste texture' },
+      { url: 'https://placehold.co/600x400.png', dataAiHint: 'tamarind paste usage' }
+    ],
     category: 'Tangy',
   },
   {
@@ -45,8 +61,13 @@ export const products: Product[] = [
     longDescription: 'A fundamental ingredient in Indian cooking, our Karnataka Garlic-Ginger Paste is made from the freshest, locally sourced garlic and ginger. This smooth, aromatic paste saves you prep time and adds a foundational flavor to a wide array of vegetarian and non-vegetarian dishes.',
     price: 9.99,
     weight: '200g',
-    imageUrl: 'https://placehold.co/600x400.png',
-    dataAiHint: 'garlic ginger',
+    images: [
+      { url: 'https://placehold.co/600x400.png', dataAiHint: 'garlic ginger main' },
+      { url: 'https://placehold.co/600x400.png', dataAiHint: 'garlic ginger closeup' },
+      { url: 'https://placehold.co/600x400.png', dataAiHint: 'fresh garlic ginger' },
+      { url: 'https://placehold.co/600x400.png', dataAiHint: 'ginger paste texture' },
+      { url: 'https://placehold.co/600x400.png', dataAiHint: 'garlic paste cooking' }
+    ],
     category: 'Aromatic',
   },
 ];

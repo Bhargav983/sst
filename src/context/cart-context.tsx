@@ -2,12 +2,12 @@
 "use client";
 
 import React, { createContext, ReactNode, useEffect } from 'react';
-import type { Product, CartItem } from '@/types';
+import type { Product, CartItem } from '@/types'; // Product type is needed for addToCart
 import useLocalStorage from '@/hooks/use-local-storage';
 
 interface CartContextType {
   cartItems: CartItem[];
-  addToCart: (product: Product, quantity: number) => void;
+  addToCart: (product: Product & { imageUrl: string }, quantity: number) => void; // Modified Product type
   removeFromCart: (productId: string) => void;
   updateQuantity: (productId: string, quantity: number) => void;
   clearCart: () => void;
@@ -26,7 +26,9 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
     setIsCartReady(true);
   }, []);
 
-  const addToCart = (product: Product, quantity: number) => {
+  // Product for addToCart now expects an imageUrl directly, 
+  // as Product type itself might not have a single imageUrl after recent changes.
+  const addToCart = (product: Product & { imageUrl: string }, quantity: number) => {
     if (quantity <= 0) return;
     setCartItems(prevItems => {
       const existingItem = prevItems.find(item => item.id === product.id);
@@ -42,7 +44,7 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
         name: product.name, 
         price: product.price, 
         quantity, 
-        imageUrl: product.imageUrl,
+        imageUrl: product.imageUrl, // Use the passed imageUrl
         weight: product.weight
       }];
     });
