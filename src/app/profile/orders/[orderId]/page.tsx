@@ -255,8 +255,8 @@ export default function UserOrderDetailPage() {
     const margin = 15; // mm
     const contentWidth = pageWidth - margin * 2;
     let y = margin;
-    const primaryLineHeight = 7; // mm
-    const secondaryLineHeight = 5; // mm
+    const primaryLineHeight = 7; // mm, for primary text like titles or main content lines
+    const secondaryLineHeight = 5; // mm, for smaller text or sub-lines
 
     // Helper function to add text and move y, centralizing y updates
     const addTextAndAdvance = (text: string | string[], x: number, currentY: number, options: any = {}, customLineHeight?: number) => {
@@ -266,11 +266,10 @@ export default function UserOrderDetailPage() {
     };
     
     const drawHorizontalLine = (currentY: number, customMargin?: number) => {
-        const lineMargin = customMargin || margin;
+        const lineMargin = customMargin === undefined ? margin : customMargin; // Use customMargin if provided, else default margin
         doc.line(lineMargin, currentY, pageWidth - lineMargin, currentY);
         return currentY + 2; // Small gap after line
     };
-
 
     // --- Invoice Header ---
     doc.setFontSize(22);
@@ -310,22 +309,27 @@ export default function UserOrderDetailPage() {
     y += primaryLineHeight * 0.5;
 
     // --- Items Table Header ---
-    y += secondaryLineHeight;
-    doc.setFontSize(11);
-    doc.setFont('helvetica', 'bold');
+    let tableHeaderY = y;
+    const drawTableHeader = () => {
+        doc.setFontSize(11);
+        doc.setFont('helvetica', 'bold');
+        const col1X = margin; // Item Description
+        const col2X = contentWidth * 0.60 + margin; // Quantity
+        const col3X = contentWidth * 0.75 + margin; // Unit Price
+        const col4X = pageWidth - margin; // Total (right aligned)
+        
+        doc.text('Item Description', col1X, tableHeaderY);
+        doc.text('Qty', col2X, tableHeaderY, { align: 'center' });
+        doc.text('Unit Price', col3X, tableHeaderY, { align: 'right' });
+        doc.text('Total', col4X, tableHeaderY, { align: 'right' });
+        tableHeaderY += secondaryLineHeight;
+        tableHeaderY = drawHorizontalLine(tableHeaderY);
+        tableHeaderY += secondaryLineHeight * 0.5;
+        return tableHeaderY;
+    };
     
-    const col1X = margin; // Item Description
-    const col2X = contentWidth * 0.60 + margin; // Quantity
-    const col3X = contentWidth * 0.75 + margin; // Unit Price
-    const col4X = pageWidth - margin; // Total (right aligned)
-    
-    doc.text('Item Description', col1X, y);
-    doc.text('Qty', col2X, y, { align: 'center' });
-    doc.text('Unit Price', col3X, y, { align: 'right' });
-    doc.text('Total', col4X, y, { align: 'right' });
-    y += secondaryLineHeight;
-    y = drawHorizontalLine(y);
-    y += secondaryLineHeight * 0.5;
+    y = drawTableHeader();
+
 
     // --- Items Table Rows ---
     doc.setFontSize(9);
@@ -334,20 +338,13 @@ export default function UserOrderDetailPage() {
       const itemDescriptionMaxWidth = contentWidth * 0.55; // Max width for item name column
       const itemNameLines = doc.splitTextToSize(`${item.name} (${item.weight || 'N/A'})`, itemDescriptionMaxWidth);
       
-      const currentItemHeight = itemNameLines.length * secondaryLineHeight * 0.8; // Approximate height for this item
+      const currentItemHeight = (itemNameLines.length * secondaryLineHeight * 0.8) + (secondaryLineHeight * 0.7) + 2; // Approx height with padding and line
+      
       if (y + currentItemHeight > pageHeight - margin - 40) { // Check for page break (leave space for footer and totals)
         doc.addPage();
         y = margin;
-        // Re-draw table headers on new page
-        doc.setFontSize(11);
-        doc.setFont('helvetica', 'bold');
-        doc.text('Item Description', col1X, y);
-        doc.text('Qty', col2X, y, { align: 'center' });
-        doc.text('Unit Price', col3X, y, { align: 'right' });
-        doc.text('Total', col4X, y, { align: 'right' });
-        y += secondaryLineHeight;
-        y = drawHorizontalLine(y);
-        y += secondaryLineHeight * 0.5;
+        tableHeaderY = y; // Reset tableHeaderY for the new page
+        y = drawTableHeader(); // Re-draw table headers on new page
         doc.setFontSize(9);
         doc.setFont('helvetica', 'normal');
       }
@@ -355,35 +352,38 @@ export default function UserOrderDetailPage() {
       let itemLineY = y;
       // Print item description lines
       itemNameLines.forEach((line: string, index: number) => {
-        doc.text(line, col1X, itemLineY + (index * secondaryLineHeight * 0.8) );
+        doc.text(line, margin, itemLineY + (index * secondaryLineHeight * 0.8) );
       });
 
       // Print other columns aligned with the first line of the item description
+      const col2X = contentWidth * 0.60 + margin; 
+      const col3X = contentWidth * 0.75 + margin;
+      const col4X = pageWidth - margin; 
       doc.text(item.quantity.toString(), col2X, itemLineY, { align: 'center' });
       doc.text(`₹${item.price.toFixed(2)}`, col3X, itemLineY, { align: 'right' });
       doc.text(`₹${(item.price * item.quantity).toFixed(2)}`, col4X, itemLineY, { align: 'right' });
       
-      y += currentItemHeight; // Advance y by the height of the current item
-      y = drawHorizontalLine(y, margin + 2); // Thinner line for items
-      y += secondaryLineHeight * 0.7;
+      // Advance y by the height of the current item content (max lines in description) + padding for line
+      y += Math.max(secondaryLineHeight * 0.8 * itemNameLines.length, secondaryLineHeight * 0.8); // Ensure at least one line height
+      y = drawHorizontalLine(y, margin + 2); // Thinner line for items, slightly indented
+      y += secondaryLineHeight * 0.7; // Padding after the line
     });
 
     // --- Totals ---
-    // Position totals block at the bottom or on a new page if necessary
-    const totalsBlockHeight = primaryLineHeight * 4; // Approximate height for totals section
-    if (y + totalsBlockHeight > pageHeight - margin - 15) { // Check if totals fit, -15 for footer
+    const totalsBlockHeight = primaryLineHeight * 4 + 5; // Approximate height for totals section including lines
+    if (y + totalsBlockHeight > pageHeight - margin - 15) { // Check if totals fit, -15 for footer space
         doc.addPage();
         y = margin;
     } else {
-        // If there's a lot of space, push totals further down.
-        y = Math.max(y, pageHeight - margin - 15 - totalsBlockHeight - primaryLineHeight);
+        // If there's a lot of space, push totals further down, but not too close to items
+        y = Math.max(y + primaryLineHeight, pageHeight - margin - 15 - totalsBlockHeight);
     }
-    y = drawHorizontalLine(y); // Line before totals
+    
+    y = drawHorizontalLine(y); 
     y += primaryLineHeight * 0.5;
 
-
-    const totalsKeyX = contentWidth * 0.65 + margin; // X for labels like "Subtotal:"
-    const totalsValueX = pageWidth - margin;   // X for values like "₹100.00" (right aligned)
+    const totalsKeyX = contentWidth * 0.65 + margin; 
+    const totalsValueX = pageWidth - margin;   
 
     doc.setFontSize(10);
     doc.setFont('helvetica', 'normal');
@@ -394,9 +394,10 @@ export default function UserOrderDetailPage() {
     doc.text('Shipping:', totalsKeyX, y, { align: 'right' });
     doc.text(`₹${orderForPdf.shippingCost.toFixed(2)}`, totalsValueX, y, { align: 'right' });
     y += primaryLineHeight * 0.5;
-    drawHorizontalLine(y, totalsKeyX - 5); // Line above grand total, make it shorter
-    y += primaryLineHeight * 0.5;
     
+    const lineAboveTotalXStart = totalsKeyX - 10; // Start the line a bit before the text
+    doc.line(lineAboveTotalXStart, y, pageWidth - margin, y); // Line above grand total
+    y += primaryLineHeight * 0.5;    
 
     doc.setFontSize(12);
     doc.setFont('helvetica', 'bold');
@@ -406,10 +407,12 @@ export default function UserOrderDetailPage() {
 
 
     // --- Footer ---
-    const footerTextY = pageHeight - margin + 5;
+    // Position footer text relative to the bottom of the page
+    const footerStartY = pageHeight - margin - (secondaryLineHeight * 2); // Start position for footer text
+
     doc.setFontSize(9);
     doc.setFont('helvetica', 'italic');
-    doc.text('Thank you for your business with SutraCart!', pageWidth / 2, footerTextY, { align: 'center' });
+    doc.text('Thank you for your business with SutraCart!', pageWidth / 2, footerStartY, { align: 'center' });
 
     // Add page numbers to all pages
     const totalPages = doc.internal.getNumberOfPages();
@@ -417,7 +420,8 @@ export default function UserOrderDetailPage() {
         doc.setPage(i); // Set current page to i
         doc.setFontSize(8);
         doc.setFont('helvetica', 'italic');
-        doc.text(`Page ${i} of ${totalPages}`, pageWidth / 2, pageHeight - margin + 10, { align: 'center' });
+        // Position page number slightly below the thank you message
+        doc.text(`Page ${i} of ${totalPages}`, pageWidth / 2, footerStartY + secondaryLineHeight, { align: 'center' });
     }
 
     doc.save(`SutraCart-Invoice-${orderForPdf.id}.pdf`);
