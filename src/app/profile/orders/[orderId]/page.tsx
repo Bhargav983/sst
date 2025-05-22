@@ -14,7 +14,7 @@ import { format } from 'date-fns';
 import Link from 'next/link';
 import Image from 'next/image';
 import { cn } from '@/lib/utils';
-import { PDFDownloadLink } from '@react-pdf/renderer';
+import { PDFDownloadLink, Page, Text, View, Document, StyleSheet as PdfStyles } from '@react-pdf/renderer'; // Import necessary components
 import InvoicePDF from '@/components/invoice/invoice-pdf';
 
 
@@ -69,7 +69,9 @@ const parseDateOrFallback = (dateInput: any, fallbackDate: Date = new Date()): D
 // Creates a deeply sanitized version of the order for PDF generation
 const getSafeOrderForPdf = (currentOrder: Order | null): Order => {
     if (!currentOrder || typeof currentOrder.id !== 'string' || currentOrder.id === 'N/A') {
-        return generateFallbackOrder('emergency-pdf-fallback');
+        // If currentOrder is null or id is invalid, return a minimal fallback.
+        // PDFDownloadLink might still fail if it absolutely needs a valid-looking ID.
+        return generateFallbackOrder('emergency-pdf-fallback-' + Date.now());
     }
 
     const safeCustomerInfo: ShippingAddress = {
@@ -89,7 +91,7 @@ const getSafeOrderForPdf = (currentOrder: Order | null): Order => {
         name: String(item?.name || 'Unknown Item'),
         price: Number(item?.price || 0),
         quantity: Number(item?.quantity || 1),
-        imageUrl: String(item?.imageUrl || 'https://placehold.co/80x80.png'),
+        imageUrl: String(item?.imageUrl || 'https://placehold.co/80x80.png'), // imageUrl not used in PDF but good to sanitize
         weight: String(item?.weight || 'N/A'),
     }));
 
@@ -100,7 +102,7 @@ const getSafeOrderForPdf = (currentOrder: Order | null): Order => {
     }));
 
     return {
-        id: String(currentOrder.id), // Already checked it's a valid string
+        id: String(currentOrder.id), 
         customerInfo: safeCustomerInfo,
         items: safeItems,
         subtotal: Number(currentOrder.subtotal || 0),
@@ -116,6 +118,23 @@ const getSafeOrderForPdf = (currentOrder: Order | null): Order => {
     };
 };
 
+// Minimal styles for the static PDF test
+const minimalPdfStyles = PdfStyles.create({
+  page: { padding: 30 },
+  text: { fontSize: 12, fontFamily: 'Helvetica' },
+});
+
+const MinimalStaticPdfDocument = (
+  <Document>
+    <Page size="A4" style={minimalPdfStyles.page}>
+      <View>
+        <Text style={minimalPdfStyles.text}>Static Test PDF Document</Text>
+        <Text style={minimalPdfStyles.text}>If this downloads, the issue is with InvoicePDF or its data.</Text>
+      </View>
+    </Page>
+  </Document>
+);
+
 
 export default function UserOrderDetailPage() {
   const params = useParams();
@@ -125,9 +144,11 @@ export default function UserOrderDetailPage() {
   const [order, setOrder] = useState<Order | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isClient, setIsClient] = useState(false);
+  const [orderForPdf, setOrderForPdf] = useState<Order | null>(null);
+
 
   useEffect(() => {
-    setIsClient(true); // Indicates component has mounted and can access browser APIs
+    setIsClient(true); 
     if (!orderId) {
       setIsLoading(false);
       return;
@@ -135,7 +156,6 @@ export default function UserOrderDetailPage() {
 
     const fetchOrder = async () => {
       setIsLoading(true);
-      // Simulate API delay
       await new Promise(resolve => setTimeout(resolve, 300)); 
 
       let foundOrder: Order | undefined;
@@ -149,9 +169,7 @@ export default function UserOrderDetailPage() {
               const allOrdersFromStorage: any[] = parsedData;
               
               const mappedOrders: Order[] = allOrdersFromStorage.map((o: any) => {
-                // Basic validation for 'o'
                 if (!o || typeof o !== 'object') {
-                  // Return a minimal structure or skip
                   return generateFallbackOrder(`malformed-entry-${Math.random()}`); 
                 }
 
@@ -208,12 +226,9 @@ export default function UserOrderDetailPage() {
         }
       }
       
-      if (foundOrder) {
-        setOrder(foundOrder);
-      } else {
-        console.warn(`Order ${orderId} not found in mock storage or parsing failed. Displaying fallback.`);
-        setOrder(generateFallbackOrder(orderId));
-      }
+      const currentOrder = foundOrder || generateFallbackOrder(orderId);
+      setOrder(currentOrder);
+      setOrderForPdf(getSafeOrderForPdf(currentOrder)); // Set the sanitized version for PDF
       setIsLoading(false);
     };
 
@@ -256,7 +271,7 @@ export default function UserOrderDetailPage() {
     );
   }
 
-  if (!order) {
+  if (!order) { // order state might still be null initially or if fallback fails badly
     return (
       <MainLayout>
         <div className="flex flex-col items-center justify-center text-center py-20">
@@ -276,9 +291,9 @@ export default function UserOrderDetailPage() {
     );
   }
   
-  // Prepare safe order for PDF rendering
-  // This variable is only created when `order` is confirmed to be non-null.
-  const orderForPdf = getSafeOrderForPdf(order);
+  // Ensure orderForPdf is set before trying to use it
+  // And ensure its id is valid for fileName
+  const canRenderPdfLink = isClient && orderForPdf && typeof orderForPdf.id === 'string' && orderForPdf.id && !orderForPdf.id.startsWith('emergency');
 
 
   return (
@@ -289,9 +304,27 @@ export default function UserOrderDetailPage() {
             <Button variant="outline" size="sm" onClick={() => router.push('/profile/orders')}>
               <ArrowLeft className="mr-2 h-4 w-4" /> Back to My Orders
             </Button>
-            {isClient && orderForPdf && ( // Use orderForPdf here for condition and props
+            
+            {/* DEBUGGING: Pass a minimal static document */}
+            {isClient && (
               <PDFDownloadLink
-                document={<InvoicePDF order={orderForPdf} />}
+                document={MinimalStaticPdfDocument}
+                fileName={`static-invoice-debug.pdf`}
+                style={{ textDecoration: 'none' }}
+              >
+                {({ loading }) => (
+                  <Button variant="outline" size="sm" disabled={loading}>
+                    <Download className="mr-2 h-4 w-4" />
+                    {loading ? 'Generating Static PDF...' : 'Download Static PDF'}
+                  </Button>
+                )}
+              </PDFDownloadLink>
+            )}
+
+            {/* Original PDF Link - for when static test passes and orderForPdf is ready */}
+            {/* {canRenderPdfLink && (
+              <PDFDownloadLink
+                document={<InvoicePDF order={orderForPdf} />} // Use orderForPdf which is sanitized
                 fileName={`invoice-${orderForPdf.id}.pdf`}
                 style={{ textDecoration: 'none' }}
               >
@@ -302,7 +335,7 @@ export default function UserOrderDetailPage() {
                   </Button>
                 )}
               </PDFDownloadLink>
-            )}
+            )} */}
           </div>
           <h1 className="text-2xl sm:text-3xl font-bold text-center sm:text-left mt-4 sm:mt-0">Order Details</h1>
           <Badge variant={getStatusBadgeVariant(order.status)} className={cn("text-sm self-center sm:self-auto", getStatusBadgeClass(order.status))}>
@@ -430,10 +463,7 @@ export default function UserOrderDetailPage() {
                 )}
             </CardContent>
         </Card>
-
       </div>
     </MainLayout>
   );
 }
-
-    
