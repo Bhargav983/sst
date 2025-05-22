@@ -9,12 +9,11 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Package, User, MapPin, DollarSign, Clock, ArrowLeft, CheckCircle, ShoppingCart, AlertTriangle, Home, Download } from 'lucide-react';
-import type { Order, StatusHistoryEntry, CartItem } from '@/types';
+import type { Order, StatusHistoryEntry, CartItem, ShippingAddress } from '@/types';
 import { format } from 'date-fns';
 import Link from 'next/link';
 import Image from 'next/image';
 import { cn } from '@/lib/utils';
-// Removed useToast as it's not directly used for PDFDownloadLink's primary UX
 import { PDFDownloadLink } from '@react-pdf/renderer';
 import InvoicePDF from '@/components/invoice/invoice-pdf';
 
@@ -23,8 +22,8 @@ import InvoicePDF from '@/components/invoice/invoice-pdf';
 const generateFallbackOrder = (orderId: string): Order => {
   const createdAt = new Date(Date.now() - Math.floor(Math.random() * 10) * 24 * 60 * 60 * 1000);
   const items: CartItem[] = [
-    { id: 'prod1-fallback', name: 'Fallback Paste A', quantity: 1, price: 10.00, imageUrl: 'https://placehold.co/80x80.png', dataAiHint: 'product item', weight: '150g' },
-    { id: 'prod2-fallback', name: 'Fallback Paste B', quantity: 2, price: 8.50, imageUrl: 'https://placehold.co/80x80.png', dataAiHint: 'product item', weight: '100g' },
+    { id: 'prod1-fallback', name: 'Fallback Paste A', quantity: 1, price: 10.00, imageUrl: 'https://placehold.co/80x80.png', weight: '150g' },
+    { id: 'prod2-fallback', name: 'Fallback Paste B', quantity: 2, price: 8.50, imageUrl: 'https://placehold.co/80x80.png', weight: '100g' },
   ];
   const subtotal = items.reduce((sum, item) => sum + item.price * item.quantity, 0);
   const shippingCost = 5.00;
@@ -65,14 +64,13 @@ export default function UserOrderDetailPage() {
   const params = useParams();
   const orderId = params.orderId as string;
   const router = useRouter();
-  // const { toast } = useToast(); // Removed as not directly used for PDFDownloadLink
 
   const [order, setOrder] = useState<Order | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [isClient, setIsClient] = useState(false); // For conditional rendering of PDFDownloadLink
+  const [isClient, setIsClient] = useState(false);
 
   useEffect(() => {
-    setIsClient(true); // Ensure PDFDownloadLink only renders on client
+    setIsClient(true);
     if (!orderId) {
       setIsLoading(false);
       return;
@@ -87,15 +85,56 @@ export default function UserOrderDetailPage() {
         const storedOrdersRaw = localStorage.getItem('userMockOrders');
         if (storedOrdersRaw) {
           try {
-            const allOrders: Order[] = JSON.parse(storedOrdersRaw);
-            foundOrder = allOrders.map(o => ({
-                ...o,
-                createdAt: new Date(o.createdAt),
-                updatedAt: new Date(o.updatedAt),
-                statusHistory: o.statusHistory?.map(sh => ({...sh, timestamp: new Date(sh.timestamp)})) || []
-            })).find(o => o.id === orderId);
+            const allOrdersFromStorage: any[] = JSON.parse(storedOrdersRaw);
+            
+            const mappedOrders: Order[] = allOrdersFromStorage.map((o: any) => {
+              const customerInfo: ShippingAddress = {
+                fullName: String(o.customerInfo?.fullName || 'N/A'),
+                email: String(o.customerInfo?.email || 'N/A'),
+                phone: String(o.customerInfo?.phone || 'N/A'),
+                addressLine1: String(o.customerInfo?.addressLine1 || 'N/A'),
+                addressLine2: String(o.customerInfo?.addressLine2 || ''),
+                city: String(o.customerInfo?.city || 'N/A'),
+                state: String(o.customerInfo?.state || 'N/A'),
+                postalCode: String(o.customerInfo?.postalCode || 'N/A'),
+                country: String(o.customerInfo?.country || 'N/A'),
+              };
+
+              const items: CartItem[] = (Array.isArray(o.items) ? o.items : []).map((it: any) => ({
+                id: String(it?.id || `item-id-${Math.random().toString(36).substring(7)}`),
+                name: String(it?.name || 'Unknown Item'),
+                price: Number(it?.price || 0),
+                quantity: Number(it?.quantity || 1),
+                imageUrl: String(it?.imageUrl || 'https://placehold.co/80x80.png'),
+                weight: String(it?.weight || 'N/A'),
+              }));
+
+              const statusHistory: StatusHistoryEntry[] = (Array.isArray(o.statusHistory) ? o.statusHistory : []).map((sh: any) => ({
+                status: sh.status || 'Pending',
+                timestamp: new Date(sh.timestamp || Date.now()),
+                notes: sh.notes,
+              }));
+              
+              return {
+                id: String(o.id || `order-id-${Math.random().toString(36).substring(7)}`),
+                customerInfo,
+                items,
+                subtotal: Number(o.subtotal || 0),
+                shippingCost: Number(o.shippingCost || 0),
+                totalAmount: Number(o.totalAmount || 0),
+                status: o.status || 'Pending',
+                paymentStatus: o.paymentStatus || 'Pending',
+                createdAt: new Date(o.createdAt || Date.now()),
+                updatedAt: new Date(o.updatedAt || Date.now()),
+                statusHistory,
+                itemSummary: String(o.itemSummary || items.map(item => `${item.name} (x${item.quantity})`).join(', ')),
+                userId: o.userId,
+              };
+            });
+            foundOrder = mappedOrders.find(o => o.id === orderId);
+
           } catch (e) {
-            console.error("Error parsing user orders from localStorage", e);
+            console.error("Error parsing user orders from localStorage or mapping data", e);
           }
         }
       }
@@ -137,7 +176,7 @@ export default function UserOrderDetailPage() {
     }
   };
 
-  if (isLoading || !isClient) { // Also wait for isClient to be true
+  if (isLoading || !isClient) {
     return (
       <MainLayout>
         <div className="text-center py-20">
@@ -176,7 +215,7 @@ export default function UserOrderDetailPage() {
             <Button variant="outline" size="sm" onClick={() => router.push('/profile/orders')}>
               <ArrowLeft className="mr-2 h-4 w-4" /> Back to My Orders
             </Button>
-            {isClient && order && ( // Ensure PDFDownloadLink is only rendered on the client and order is available
+            {isClient && order && typeof order.id === 'string' && order.id !== 'N/A' && (
               <PDFDownloadLink
                 document={<InvoicePDF order={order} />}
                 fileName={`invoice-${order.id}.pdf`}
@@ -202,11 +241,11 @@ export default function UserOrderDetailPage() {
             <CardTitle className="flex items-center justify-between">
                 <span>Order ID: #{order.id}</span>
                 <span className="text-sm font-normal text-muted-foreground">
-                    Placed on: {format(new Date(order.createdAt), 'PPpp')}
+                    Placed on: {order.createdAt ? format(new Date(order.createdAt), 'PPpp') : 'N/A'}
                 </span>
             </CardTitle>
             <CardDescription>
-                Last updated: {format(new Date(order.updatedAt), 'PPpp')}
+                Last updated: {order.updatedAt ? format(new Date(order.updatedAt), 'PPpp') : 'N/A'}
             </CardDescription>
           </CardHeader>
         </Card>
@@ -217,7 +256,7 @@ export default function UserOrderDetailPage() {
               <CardTitle className="flex items-center gap-2"><Package className="h-5 w-5 text-primary" />Order Items</CardTitle>
             </CardHeader>
             <CardContent className="divide-y">
-              {order.items.map(item => (
+              {(order.items || []).map(item => (
                 <div key={item.id} className="flex items-center gap-4 py-4">
                   <Image src={item.imageUrl} alt={item.name} width={80} height={80} className="rounded-md border" data-ai-hint="product item" />
                   <div className="flex-grow">
@@ -282,7 +321,6 @@ export default function UserOrderDetailPage() {
                             {order.paymentStatus}
                         </Badge>
                     </div>
-                    {/* Placeholder for more payment details if needed */}
                 </CardContent>
             </Card>
           </div>
@@ -305,7 +343,7 @@ export default function UserOrderDetailPage() {
                                             {entry.status}
                                         </Badge>
                                         <span className="text-xs text-muted-foreground">
-                                            {format(new Date(entry.timestamp), 'dd MMM yyyy, HH:mm')}
+                                            {entry.timestamp ? format(new Date(entry.timestamp), 'dd MMM yyyy, HH:mm') : 'N/A'}
                                         </span>
                                     </div>
                                     {entry.notes && <p className="text-xs text-muted-foreground italic mt-1">({entry.notes})</p>}
@@ -323,3 +361,4 @@ export default function UserOrderDetailPage() {
     </MainLayout>
   );
 }
+
