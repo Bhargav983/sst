@@ -68,7 +68,8 @@ const parseDateOrFallback = (dateInput: any, fallbackDate: Date = new Date()): D
 
 // Creates a deeply sanitized version of the order for PDF generation
 const getSafeOrderForPdf = (currentOrder: Order | null): Order => {
-    if (!currentOrder || typeof currentOrder.id !== 'string' || currentOrder.id === 'N/A') {
+    if (!currentOrder || typeof currentOrder.id !== 'string' || currentOrder.id === 'N/A' || currentOrder.id.startsWith('emergency')) {
+        // Generate a more distinct ID for fallbacks to make debugging easier
         return generateFallbackOrder('emergency-pdf-fallback-' + Date.now());
     }
 
@@ -85,7 +86,7 @@ const getSafeOrderForPdf = (currentOrder: Order | null): Order => {
     };
     
     const safeItems: CartItem[] = (Array.isArray(currentOrder.items) ? currentOrder.items : []).map(item => ({
-        id: String(item?.id || `item-${Math.random()}`),
+        id: String(item?.id || `item-${Math.random().toString(36).substring(7)}`),
         name: String(item?.name || 'Unknown Item'),
         price: Number(item?.price || 0),
         quantity: Number(item?.quantity || 1),
@@ -115,16 +116,6 @@ const getSafeOrderForPdf = (currentOrder: Order | null): Order => {
         userId: String(currentOrder.userId || ''),
     };
 };
-
-
-// Hyper minimal document for testing PDFDownloadLink
-const BareMinimumPdfDocument = () => (
-  <Document>
-    <Page size="A4">
-      <Text>Test</Text>
-    </Page>
-  </Document>
-);
 
 
 export default function UserOrderDetailPage() {
@@ -161,7 +152,7 @@ export default function UserOrderDetailPage() {
               
               const mappedOrders: Order[] = allOrdersFromStorage.map((o: any) => {
                 if (!o || typeof o !== 'object') {
-                  return generateFallbackOrder(`malformed-entry-${Math.random()}`); 
+                  return generateFallbackOrder(`malformed-entry-${Math.random().toString(36).substring(7)}`); 
                 }
 
                 const customerInfo: ShippingAddress = {
@@ -219,7 +210,7 @@ export default function UserOrderDetailPage() {
       
       const currentOrder = foundOrder || generateFallbackOrder(orderId);
       setOrder(currentOrder);
-      setOrderForPdf(getSafeOrderForPdf(currentOrder));
+      setOrderForPdf(getSafeOrderForPdf(currentOrder)); // Prepare sanitized version for PDF
       setIsLoading(false);
     };
 
@@ -262,7 +253,7 @@ export default function UserOrderDetailPage() {
     );
   }
 
-  if (!order) {
+  if (!order) { // Should ideally be covered by orderForPdf check for PDF link
     return (
       <MainLayout>
         <div className="flex flex-col items-center justify-center text-center py-20">
@@ -284,7 +275,6 @@ export default function UserOrderDetailPage() {
   
   const canRenderPdfLink = isClient && orderForPdf && typeof orderForPdf.id === 'string' && orderForPdf.id && !orderForPdf.id.startsWith('emergency');
 
-
   return (
     <MainLayout>
       <div className="space-y-8">
@@ -294,47 +284,38 @@ export default function UserOrderDetailPage() {
               <ArrowLeft className="mr-2 h-4 w-4" /> Back to My Orders
             </Button>
             
-            {/* DEBUGGING: Pass a hyper minimal static document */}
-            {isClient && ( // Only render PDFLink on client
+            {canRenderPdfLink ? (
               <PDFDownloadLink
-                document={<BareMinimumPdfDocument />}
-                fileName={`bare-minimum-debug.pdf`}
-              >
-                {({ loading }) => (
-                  <Button variant="outline" size="sm" disabled={loading}>
-                    <Download className="mr-2 h-4 w-4" />
-                    {loading ? 'Generating Bare Min PDF...' : 'Download Bare Min PDF'}
-                  </Button>
-                )}
-              </PDFDownloadLink>
-            )}
-
-            {/* Original PDF Link - for when static test passes and orderForPdf is ready */}
-            {/* {canRenderPdfLink && (
-              <PDFDownloadLink
-                document={<InvoicePDF order={orderForPdf} />} // Use orderForPdf which is sanitized
+                document={<InvoicePDF order={orderForPdf} />} 
                 fileName={`invoice-${orderForPdf.id}.pdf`}
                 style={{ textDecoration: 'none' }}
               >
-                {({ loading }) => (
+                {({ loading, error }) => ( // Add error to see if library reports anything
                   <Button variant="outline" size="sm" disabled={loading}>
                     <Download className="mr-2 h-4 w-4" />
-                    {loading ? 'Generating PDF...' : 'Download Invoice'}
+                    {loading ? 'Generating PDF...' : (error ? 'Error PDF' : 'Download Invoice')}
                   </Button>
                 )}
               </PDFDownloadLink>
-            )} */}
+            ) : (
+                 <Button variant="outline" size="sm" disabled>
+                    <Download className="mr-2 h-4 w-4" />
+                    Invoice Unavailable
+                  </Button>
+            )}
           </div>
           <h1 className="text-2xl sm:text-3xl font-bold text-center sm:text-left mt-4 sm:mt-0">Order Details</h1>
-          <Badge variant={getStatusBadgeVariant(order.status)} className={cn("text-sm self-center sm:self-auto", getStatusBadgeClass(order.status))}>
-            Status: {order.status}
-          </Badge>
+          {order.status && 
+            <Badge variant={getStatusBadgeVariant(order.status)} className={cn("text-sm self-center sm:self-auto", getStatusBadgeClass(order.status))}>
+              Status: {order.status}
+            </Badge>
+          }
         </div>
 
         <Card className="shadow-lg">
           <CardHeader>
             <CardTitle className="flex items-center justify-between">
-                <span>Order ID: #{order.id}</span>
+                <span>Order ID: #{order.id || 'N/A'}</span>
                 <span className="text-sm font-normal text-muted-foreground">
                     Placed on: {order.createdAt ? format(parseDateOrFallback(order.createdAt), 'PPpp') : 'N/A'}
                 </span>
@@ -355,11 +336,11 @@ export default function UserOrderDetailPage() {
                 <div key={item.id} className="flex items-center gap-4 py-4">
                   <Image src={item.imageUrl} alt={item.name} width={80} height={80} className="rounded-md border" data-ai-hint="product item" />
                   <div className="flex-grow">
-                    <p className="font-semibold">{item.name}</p>
-                    <p className="text-sm text-muted-foreground">Qty: {item.quantity} &bull; {item.weight}</p>
-                    <p className="text-sm text-muted-foreground">Price: ₹{Number(item.price).toFixed(2)} each</p>
+                    <p className="font-semibold">{item.name || 'Unknown Item'}</p>
+                    <p className="text-sm text-muted-foreground">Qty: {item.quantity || 1} &bull; {item.weight || 'N/A'}</p>
+                    <p className="text-sm text-muted-foreground">Price: ₹{Number(item.price || 0).toFixed(2)} each</p>
                   </div>
-                  <p className="font-semibold text-md">₹{(Number(item.price) * Number(item.quantity)).toFixed(2)}</p>
+                  <p className="font-semibold text-md">₹{(Number(item.price || 0) * Number(item.quantity || 1)).toFixed(2)}</p>
                 </div>
               ))}
             </CardContent>
@@ -367,16 +348,16 @@ export default function UserOrderDetailPage() {
                 <div className="w-full space-y-2 text-right">
                     <div className="flex justify-between items-center text-md">
                         <span className="text-muted-foreground">Subtotal:</span>
-                        <span className="font-semibold">₹{Number(order.subtotal).toFixed(2)}</span>
+                        <span className="font-semibold">₹{Number(order.subtotal || 0).toFixed(2)}</span>
                     </div>
                     <div className="flex justify-between items-center text-md">
                         <span className="text-muted-foreground">Shipping:</span>
-                        <span className="font-semibold">₹{Number(order.shippingCost).toFixed(2)}</span>
+                        <span className="font-semibold">₹{Number(order.shippingCost || 0).toFixed(2)}</span>
                     </div>
                     <Separator className="my-2" />
                     <div className="flex justify-between items-center text-xl font-bold">
                         <span>Total:</span>
-                        <span>₹{Number(order.totalAmount).toFixed(2)}</span>
+                        <span>₹{Number(order.totalAmount || 0).toFixed(2)}</span>
                     </div>
                 </div>
             </CardFooter>
@@ -388,16 +369,16 @@ export default function UserOrderDetailPage() {
                 <CardTitle className="flex items-center gap-2"><MapPin className="h-5 w-5 text-primary" />Shipping Address</CardTitle>
               </CardHeader>
               <CardContent className="text-sm space-y-1">
-                <p className="font-semibold">{order.customerInfo.fullName}</p>
-                <p>{order.customerInfo.addressLine1}</p>
-                {order.customerInfo.addressLine2 && <p>{order.customerInfo.addressLine2}</p>}
-                <p>{order.customerInfo.city}, {order.customerInfo.state} - {order.customerInfo.postalCode}</p>
-                <p>{order.customerInfo.country}</p>
+                <p className="font-semibold">{order.customerInfo?.fullName || 'N/A'}</p>
+                <p>{order.customerInfo?.addressLine1 || 'N/A'}</p>
+                {order.customerInfo?.addressLine2 && <p>{order.customerInfo.addressLine2}</p>}
+                <p>{order.customerInfo?.city || 'N/A'}, {order.customerInfo?.state || 'N/A'} - {order.customerInfo?.postalCode || 'N/A'}</p>
+                <p>{order.customerInfo?.country || 'N/A'}</p>
                 <p className="mt-2">
-                    <span className="text-muted-foreground">Email:</span> {order.customerInfo.email}
+                    <span className="text-muted-foreground">Email:</span> {order.customerInfo?.email || 'N/A'}
                 </p>
                  <p>
-                    <span className="text-muted-foreground">Phone:</span> {order.customerInfo.phone || 'N/A'}
+                    <span className="text-muted-foreground">Phone:</span> {order.customerInfo?.phone || 'N/A'}
                  </p>
               </CardContent>
             </Card>
@@ -409,12 +390,15 @@ export default function UserOrderDetailPage() {
                 <CardContent className="text-sm">
                     <div className="flex items-center gap-1.5">
                         Payment Status: 
-                        <Badge 
-                            variant={order.paymentStatus === 'Paid' ? 'default' : 'destructive'} 
-                            className={cn(order.paymentStatus === 'Paid' ? 'bg-green-500 text-white' : 'bg-red-500 text-white')}
-                        >
-                            {order.paymentStatus}
-                        </Badge>
+                        {order.paymentStatus &&
+                          <Badge 
+                              variant={order.paymentStatus === 'Paid' ? 'default' : 'destructive'} 
+                              className={cn(order.paymentStatus === 'Paid' ? 'bg-green-500 text-white' : 'bg-red-500 text-white')}
+                          >
+                              {order.paymentStatus}
+                          </Badge>
+                        }
+                        {!order.paymentStatus && <Badge variant="secondary">N/A</Badge>}
                     </div>
                 </CardContent>
             </Card>
@@ -434,9 +418,12 @@ export default function UserOrderDetailPage() {
                                 <div className="absolute left-[-0.30rem] top-1.5 h-3 w-3 rounded-full bg-primary border-2 border-background"></div>
                                 <div className="ml-4">
                                     <div className="flex items-center justify-between">
-                                        <Badge variant={getStatusBadgeVariant(entry.status)} className={cn('text-xs', getStatusBadgeClass(entry.status))}>
-                                            {entry.status}
-                                        </Badge>
+                                        {entry.status && 
+                                          <Badge variant={getStatusBadgeVariant(entry.status)} className={cn('text-xs', getStatusBadgeClass(entry.status))}>
+                                              {entry.status}
+                                          </Badge>
+                                        }
+                                        {!entry.status && <Badge variant="secondary" className="text-xs">N/A</Badge>}
                                         <span className="text-xs text-muted-foreground">
                                             {entry.timestamp ? format(parseDateOrFallback(entry.timestamp), 'dd MMM yyyy, HH:mm') : 'N/A'}
                                         </span>
@@ -455,7 +442,3 @@ export default function UserOrderDetailPage() {
     </MainLayout>
   );
 }
-
-    
-
-    
