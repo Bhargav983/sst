@@ -51,7 +51,7 @@ export default function CartPage() {
             </CardHeader>
             <CardContent className="divide-y">
               {cartItems.map(item => (
-                <CartItemDisplay key={item.id} item={item} />
+                <CartItemDisplay key={item.variantSku || `${item.id}-${item.weight}`} item={item} />
               ))}
             </CardContent>
             <CardFooter className="flex justify-end p-4">
