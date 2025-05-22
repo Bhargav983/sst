@@ -244,68 +244,183 @@ export default function UserOrderDetailPage() {
   const handleDownloadJsPdfInvoice = () => {
     if (!orderForPdf) return;
 
-    const doc = new jsPDF();
-    const margin = 15;
+    const doc = new jsPDF({
+        orientation: 'p', // portrait
+        unit: 'mm', // millimeters
+        format: 'a4', // A4 size
+    });
+
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const pageHeight = doc.internal.pageSize.getHeight();
+    const margin = 15; // mm
+    const contentWidth = pageWidth - margin * 2;
     let y = margin;
+    const primaryLineHeight = 7; // mm
+    const secondaryLineHeight = 5; // mm
+
+    // Helper function to add text and move y, centralizing y updates
+    const addTextAndAdvance = (text: string | string[], x: number, currentY: number, options: any = {}, customLineHeight?: number) => {
+        doc.text(text, x, currentY, options);
+        const lines = Array.isArray(text) ? text.length : 1;
+        return currentY + (customLineHeight || primaryLineHeight) * lines;
+    };
+    
+    const drawHorizontalLine = (currentY: number, customMargin?: number) => {
+        const lineMargin = customMargin || margin;
+        doc.line(lineMargin, currentY, pageWidth - lineMargin, currentY);
+        return currentY + 2; // Small gap after line
+    };
+
+
+    // --- Invoice Header ---
+    doc.setFontSize(22);
+    doc.setFont('helvetica', 'bold');
+    y = addTextAndAdvance('SutraCart', margin, y, {}, primaryLineHeight * 1.2);
 
     doc.setFontSize(18);
-    doc.text('SutraCart Invoice', margin, y);
-    y += 10;
-
-    doc.setFontSize(12);
-    doc.text(`Order ID: ${orderForPdf.id}`, margin, y);
-    y += 7;
-    doc.text(`Date: ${format(parseDateOrFallback(orderForPdf.createdAt), 'PP')}`, margin, y);
-    y += 7;
-    doc.text(`Customer: ${orderForPdf.customerInfo.fullName}`, margin, y);
-    y += 7;
-    doc.text(`Email: ${orderForPdf.customerInfo.email}`, margin, y);
-    y += 10;
-
-    doc.text('Shipping Address:', margin, y);
-    y += 7;
-    doc.text(orderForPdf.customerInfo.addressLine1, margin, y);
-    y += 7;
-    if (orderForPdf.customerInfo.addressLine2) {
-      doc.text(orderForPdf.customerInfo.addressLine2, margin, y);
-      y += 7;
-    }
-    doc.text(`${orderForPdf.customerInfo.city}, ${orderForPdf.customerInfo.state} - ${orderForPdf.customerInfo.postalCode}`, margin, y);
-    y += 7;
-    doc.text(orderForPdf.customerInfo.country, margin, y);
-    y += 10;
-
-    doc.setFontSize(14);
-    doc.text('Items:', margin, y);
-    y += 8;
+    y = addTextAndAdvance('Invoice', margin, y);
+    
     doc.setFontSize(10);
+    doc.setFont('helvetica', 'normal');
+    doc.text(`Order ID: ${orderForPdf.id}`, margin, y);
+    doc.text(`Date: ${format(parseDateOrFallback(orderForPdf.createdAt), 'PPP')}`, pageWidth - margin, y, { align: 'right' });
+    y += primaryLineHeight;
+    y = drawHorizontalLine(y);
+    y += secondaryLineHeight;
 
+    // --- Addresses ---
+    doc.setFontSize(12);
+    doc.setFont('helvetica', 'bold');
+    y = addTextAndAdvance('Shipping Address:', margin, y, {}, primaryLineHeight * 0.8);
+
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'normal');
+    const custInfo = orderForPdf.customerInfo;
+    y = addTextAndAdvance(custInfo.fullName, margin, y, {}, secondaryLineHeight);
+    y = addTextAndAdvance(custInfo.addressLine1, margin, y, {}, secondaryLineHeight);
+    if (custInfo.addressLine2) {
+      y = addTextAndAdvance(custInfo.addressLine2, margin, y, {}, secondaryLineHeight);
+    }
+    y = addTextAndAdvance(`${custInfo.city}, ${custInfo.state} - ${custInfo.postalCode}`, margin, y, {}, secondaryLineHeight);
+    y = addTextAndAdvance(custInfo.country, margin, y, {}, secondaryLineHeight);
+    y = addTextAndAdvance(`Email: ${custInfo.email}`, margin, y, {}, secondaryLineHeight);
+    y = addTextAndAdvance(`Phone: ${custInfo.phone}`, margin, y, {}, secondaryLineHeight);
+    y += primaryLineHeight * 0.5;
+    y = drawHorizontalLine(y);
+    y += primaryLineHeight * 0.5;
+
+    // --- Items Table Header ---
+    y += secondaryLineHeight;
+    doc.setFontSize(11);
+    doc.setFont('helvetica', 'bold');
+    
+    const col1X = margin; // Item Description
+    const col2X = contentWidth * 0.60 + margin; // Quantity
+    const col3X = contentWidth * 0.75 + margin; // Unit Price
+    const col4X = pageWidth - margin; // Total (right aligned)
+    
+    doc.text('Item Description', col1X, y);
+    doc.text('Qty', col2X, y, { align: 'center' });
+    doc.text('Unit Price', col3X, y, { align: 'right' });
+    doc.text('Total', col4X, y, { align: 'right' });
+    y += secondaryLineHeight;
+    y = drawHorizontalLine(y);
+    y += secondaryLineHeight * 0.5;
+
+    // --- Items Table Rows ---
+    doc.setFontSize(9);
+    doc.setFont('helvetica', 'normal');
     (orderForPdf.items || []).forEach(item => {
-      if (y > 270) { // Simple page break logic
+      const itemDescriptionMaxWidth = contentWidth * 0.55; // Max width for item name column
+      const itemNameLines = doc.splitTextToSize(`${item.name} (${item.weight || 'N/A'})`, itemDescriptionMaxWidth);
+      
+      const currentItemHeight = itemNameLines.length * secondaryLineHeight * 0.8; // Approximate height for this item
+      if (y + currentItemHeight > pageHeight - margin - 40) { // Check for page break (leave space for footer and totals)
         doc.addPage();
         y = margin;
+        // Re-draw table headers on new page
+        doc.setFontSize(11);
+        doc.setFont('helvetica', 'bold');
+        doc.text('Item Description', col1X, y);
+        doc.text('Qty', col2X, y, { align: 'center' });
+        doc.text('Unit Price', col3X, y, { align: 'right' });
+        doc.text('Total', col4X, y, { align: 'right' });
+        y += secondaryLineHeight;
+        y = drawHorizontalLine(y);
+        y += secondaryLineHeight * 0.5;
+        doc.setFontSize(9);
+        doc.setFont('helvetica', 'normal');
       }
-      doc.text(`${item.name} (x${item.quantity}) - ${item.weight}`, margin, y);
-      doc.text(`₹${(item.price * item.quantity).toFixed(2)}`, 160, y, { align: 'right' });
-      y += 6;
-    });
-    y += 5;
 
-    doc.setFontSize(12);
-    doc.text(`Subtotal: ₹${orderForPdf.subtotal.toFixed(2)}`, 160, y, { align: 'right' });
-    y += 7;
-    doc.text(`Shipping: ₹${orderForPdf.shippingCost.toFixed(2)}`, 160, y, { align: 'right' });
-    y += 7;
-    doc.setFontSize(14);
-    doc.setFont('helvetica', 'bold');
-    doc.text(`Total: ₹${orderForPdf.totalAmount.toFixed(2)}`, 160, y, { align: 'right' });
-    doc.setFont('helvetica', 'normal');
-    y += 15;
+      let itemLineY = y;
+      // Print item description lines
+      itemNameLines.forEach((line: string, index: number) => {
+        doc.text(line, col1X, itemLineY + (index * secondaryLineHeight * 0.8) );
+      });
+
+      // Print other columns aligned with the first line of the item description
+      doc.text(item.quantity.toString(), col2X, itemLineY, { align: 'center' });
+      doc.text(`₹${item.price.toFixed(2)}`, col3X, itemLineY, { align: 'right' });
+      doc.text(`₹${(item.price * item.quantity).toFixed(2)}`, col4X, itemLineY, { align: 'right' });
+      
+      y += currentItemHeight; // Advance y by the height of the current item
+      y = drawHorizontalLine(y, margin + 2); // Thinner line for items
+      y += secondaryLineHeight * 0.7;
+    });
+
+    // --- Totals ---
+    // Position totals block at the bottom or on a new page if necessary
+    const totalsBlockHeight = primaryLineHeight * 4; // Approximate height for totals section
+    if (y + totalsBlockHeight > pageHeight - margin - 15) { // Check if totals fit, -15 for footer
+        doc.addPage();
+        y = margin;
+    } else {
+        // If there's a lot of space, push totals further down.
+        y = Math.max(y, pageHeight - margin - 15 - totalsBlockHeight - primaryLineHeight);
+    }
+    y = drawHorizontalLine(y); // Line before totals
+    y += primaryLineHeight * 0.5;
+
+
+    const totalsKeyX = contentWidth * 0.65 + margin; // X for labels like "Subtotal:"
+    const totalsValueX = pageWidth - margin;   // X for values like "₹100.00" (right aligned)
 
     doc.setFontSize(10);
-    doc.text('Thank you for your order!', margin, y);
+    doc.setFont('helvetica', 'normal');
+    doc.text('Subtotal:', totalsKeyX, y, { align: 'right' });
+    doc.text(`₹${orderForPdf.subtotal.toFixed(2)}`, totalsValueX, y, { align: 'right' });
+    y += primaryLineHeight;
 
-    doc.save(`invoice-${orderForPdf.id}.pdf`);
+    doc.text('Shipping:', totalsKeyX, y, { align: 'right' });
+    doc.text(`₹${orderForPdf.shippingCost.toFixed(2)}`, totalsValueX, y, { align: 'right' });
+    y += primaryLineHeight * 0.5;
+    drawHorizontalLine(y, totalsKeyX - 5); // Line above grand total, make it shorter
+    y += primaryLineHeight * 0.5;
+    
+
+    doc.setFontSize(12);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Grand Total:', totalsKeyX, y, { align: 'right' });
+    doc.text(`₹${orderForPdf.totalAmount.toFixed(2)}`, totalsValueX, y, { align: 'right' });
+    y += primaryLineHeight * 1.5;
+
+
+    // --- Footer ---
+    const footerTextY = pageHeight - margin + 5;
+    doc.setFontSize(9);
+    doc.setFont('helvetica', 'italic');
+    doc.text('Thank you for your business with SutraCart!', pageWidth / 2, footerTextY, { align: 'center' });
+
+    // Add page numbers to all pages
+    const totalPages = doc.internal.getNumberOfPages();
+    for (let i = 1; i <= totalPages; i++) {
+        doc.setPage(i); // Set current page to i
+        doc.setFontSize(8);
+        doc.setFont('helvetica', 'italic');
+        doc.text(`Page ${i} of ${totalPages}`, pageWidth / 2, pageHeight - margin + 10, { align: 'center' });
+    }
+
+    doc.save(`SutraCart-Invoice-${orderForPdf.id}.pdf`);
   };
 
 
