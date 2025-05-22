@@ -8,12 +8,13 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter }
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
-import { Package, User, MapPin, DollarSign, Clock, ArrowLeft, CheckCircle, ShoppingCart, AlertTriangle, Home } from 'lucide-react';
+import { Package, User, MapPin, DollarSign, Clock, ArrowLeft, CheckCircle, ShoppingCart, AlertTriangle, Home, Download } from 'lucide-react';
 import type { Order, StatusHistoryEntry, CartItem } from '@/types';
 import { format } from 'date-fns';
 import Link from 'next/link';
 import Image from 'next/image';
 import { cn } from '@/lib/utils';
+import { useToast } from '@/hooks/use-toast';
 
 // Helper function to generate a fallback order if not found in localStorage
 const generateFallbackOrder = (orderId: string): Order => {
@@ -61,6 +62,7 @@ export default function UserOrderDetailPage() {
   const params = useParams();
   const orderId = params.orderId as string;
   const router = useRouter();
+  const { toast } = useToast();
 
   const [order, setOrder] = useState<Order | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -108,6 +110,17 @@ export default function UserOrderDetailPage() {
 
     fetchOrder();
   }, [orderId]);
+
+  const handleDownloadInvoice = () => {
+    console.log(`Simulating invoice download for order: ${orderId}`);
+    toast({
+      title: "Invoice Download Started",
+      description: `Your invoice for order #${orderId} is being prepared.`,
+    });
+    // In a real app, you would trigger the actual download here.
+    // For example, by creating a hidden <a> element and clicking it,
+    // or by calling a backend endpoint that returns the PDF.
+  };
 
   const getStatusBadgeVariant = (status: Order['status'] | undefined) => {
     if (!status) return 'default';
@@ -168,10 +181,15 @@ export default function UserOrderDetailPage() {
     <MainLayout>
       <div className="space-y-8">
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-          <Button variant="outline" size="sm" onClick={() => router.push('/profile/orders')}>
-            <ArrowLeft className="mr-2 h-4 w-4" /> Back to My Orders
-          </Button>
-          <h1 className="text-2xl sm:text-3xl font-bold text-center sm:text-left">Order Details</h1>
+          <div className="flex gap-2">
+            <Button variant="outline" size="sm" onClick={() => router.push('/profile/orders')}>
+              <ArrowLeft className="mr-2 h-4 w-4" /> Back to My Orders
+            </Button>
+            <Button variant="outline" size="sm" onClick={handleDownloadInvoice}>
+              <Download className="mr-2 h-4 w-4" /> Download Invoice
+            </Button>
+          </div>
+          <h1 className="text-2xl sm:text-3xl font-bold text-center sm:text-left mt-4 sm:mt-0">Order Details</h1>
           <Badge variant={getStatusBadgeVariant(order.status)} className={cn("text-sm self-center sm:self-auto", getStatusBadgeClass(order.status))}>
             Status: {order.status}
           </Badge>
@@ -303,5 +321,7 @@ export default function UserOrderDetailPage() {
     </MainLayout>
   );
 }
+
+    
 
     
