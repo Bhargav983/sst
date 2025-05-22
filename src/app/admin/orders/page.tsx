@@ -17,11 +17,11 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import type { Order, ShippingAddress } from '@/types';
+import type { Order, ShippingAddress, StatusHistoryEntry } from '@/types'; // Added StatusHistoryEntry
 import { format } from 'date-fns';
 import { ChevronLeft, ChevronRight, Search, PackageSearch, UserCircle, CalendarDays, FilterX } from 'lucide-react';
 import Link from 'next/link';
-import { cn } from '@/lib/utils'; // Added import for cn
+import { cn } from '@/lib/utils';
 
 const ITEMS_PER_PAGE = 10;
 
@@ -44,7 +44,40 @@ const generateDummyOrders = (count: number): Order[] => {
     const subtotal = items.reduce((sum, item) => sum + item.price * item.quantity, 0);
     const shippingCost = 5.00;
     const totalAmount = subtotal + shippingCost;
-    const randomDate = new Date(Date.now() - Math.floor(Math.random() * 30) * 24 * 60 * 60 * 1000);
+    const createdAt = new Date(Date.now() - Math.floor(Math.random() * 30) * 24 * 60 * 60 * 1000);
+    const currentStatus = statuses[Math.floor(Math.random() * statuses.length)];
+    
+    let statusHistory: StatusHistoryEntry[] = [{ status: 'Pending', timestamp: createdAt }];
+    let lastStatusDate = new Date(createdAt.getTime() + (Math.random() * 24 * 60 * 60 * 1000)); // within 1 day
+
+    if (currentStatus === 'Processing' || currentStatus === 'Shipped' || currentStatus === 'Delivered') {
+      if (statusHistory[statusHistory.length-1].status !== 'Processing') {
+        statusHistory.push({ status: 'Processing', timestamp: lastStatusDate });
+        lastStatusDate = new Date(lastStatusDate.getTime() + (Math.random() * 48 * 60 * 60 * 1000)); // within 2 days
+      }
+    }
+    if (currentStatus === 'Shipped' || currentStatus === 'Delivered') {
+      if (statusHistory[statusHistory.length-1].status !== 'Shipped') {
+         statusHistory.push({ status: 'Shipped', timestamp: lastStatusDate });
+         lastStatusDate = new Date(lastStatusDate.getTime() + (Math.random() * 72 * 60 * 60 * 1000)); // within 3 days
+      }
+    }
+    if (currentStatus === 'Delivered') {
+       if (statusHistory[statusHistory.length-1].status !== 'Delivered') {
+        statusHistory.push({ status: 'Delivered', timestamp: lastStatusDate });
+      }
+    }
+     if (currentStatus !== 'Cancelled' && currentStatus !== statusHistory[statusHistory.length-1].status) {
+        statusHistory.push({ status: currentStatus, timestamp: new Date(lastStatusDate.getTime() + (Math.random() * 24 * 60 * 60 * 1000)) });
+    } else if (currentStatus === 'Cancelled' && statusHistory[statusHistory.length-1].status !== 'Cancelled') {
+         statusHistory.push({ status: 'Cancelled', timestamp: new Date(lastStatusDate.getTime() + (Math.random() * 24 * 60 * 60 * 1000)) });
+    }
+    
+    // Ensure the last status in history matches the order's current status
+    if (statusHistory[statusHistory.length -1].status !== currentStatus) {
+        statusHistory.push({status: currentStatus, timestamp: new Date(statusHistory[statusHistory.length -1].timestamp.getTime() + 1000 * 60 * 60) }) // 1 hour later
+    }
+
 
     return {
       id: `SUTRA-ADMIN-${1000 + i}`,
@@ -63,10 +96,11 @@ const generateDummyOrders = (count: number): Order[] => {
       subtotal: parseFloat(subtotal.toFixed(2)),
       shippingCost: parseFloat(shippingCost.toFixed(2)),
       totalAmount: parseFloat(totalAmount.toFixed(2)),
-      status: statuses[Math.floor(Math.random() * statuses.length)],
+      status: currentStatus,
       paymentStatus: paymentStatuses[Math.floor(Math.random() * paymentStatuses.length)],
-      createdAt: randomDate,
-      updatedAt: new Date(randomDate.getTime() + Math.floor(Math.random() * 5) * 24 * 60 * 60 * 1000),
+      createdAt: createdAt,
+      updatedAt: statusHistory[statusHistory.length -1].timestamp,
+      statusHistory: statusHistory.sort((a,b) => a.timestamp.getTime() - b.timestamp.getTime()),
     };
   });
 };
@@ -137,9 +171,9 @@ export default function AdminOrdersPage() {
   const getStatusBadgeVariant = (status: Order['status']) => {
     switch (status) {
       case 'Pending': return 'secondary';
-      case 'Processing': return 'default'; // using primary color
-      case 'Shipped': return 'outline'; // could be a blue-ish
-      case 'Delivered': return 'default'; // using green-ish
+      case 'Processing': return 'default'; 
+      case 'Shipped': return 'outline'; 
+      case 'Delivered': return 'default'; 
       case 'Cancelled': return 'destructive';
       default: return 'default';
     }
@@ -201,7 +235,7 @@ export default function AdminOrdersPage() {
                 <TabsTrigger value="Cancelled">Cancelled</TabsTrigger>
               </TabsList>
               
-              <TabsContent value={activeTab} className="mt-0"> {/* Use activeTab for all TabContent to render one */}
+              <TabsContent value={activeTab} className="mt-0"> 
                 {paginatedOrders.length === 0 ? (
                   <div className="text-center py-10 text-muted-foreground">
                     <PackageSearch className="h-16 w-16 mx-auto mb-4" />

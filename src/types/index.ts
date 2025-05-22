@@ -33,6 +33,12 @@ export interface ShippingAddress {
   country: string;
 }
 
+export interface StatusHistoryEntry {
+  status: Order['status'];
+  timestamp: Date;
+  notes?: string; // Optional for admin to add notes
+}
+
 export interface Order {
   id: string; // Firestore document ID
   userId?: string; // For registered users
@@ -46,6 +52,7 @@ export interface Order {
   paymentStatus: 'Pending' | 'Paid' | 'Failed';
   createdAt: Date; // Or Firestore Timestamp
   updatedAt: Date; // Or Firestore Timestamp
+  statusHistory?: StatusHistoryEntry[]; // New field for chronological status changes
 }
 
 // For AuthContext, basic user type
