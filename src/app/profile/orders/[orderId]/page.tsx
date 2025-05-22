@@ -41,6 +41,7 @@ const generateFallbackOrder = (orderId: string): Order => {
       email: 'customer@example.com',
       phone: 'N/A',
       addressLine1: '123 Your Street',
+      addressLine2: '',
       city: 'YourCity',
       state: 'YourState',
       postalCode: '00000',
@@ -56,6 +57,7 @@ const generateFallbackOrder = (orderId: string): Order => {
     createdAt,
     updatedAt: statusHistory[statusHistory.length -1].timestamp,
     statusHistory,
+    userId: 'fallback-user-id',
   };
 };
 
@@ -85,54 +87,59 @@ export default function UserOrderDetailPage() {
         const storedOrdersRaw = localStorage.getItem('userMockOrders');
         if (storedOrdersRaw) {
           try {
-            const allOrdersFromStorage: any[] = JSON.parse(storedOrdersRaw);
+            const parsedData = JSON.parse(storedOrdersRaw);
             
-            const mappedOrders: Order[] = allOrdersFromStorage.map((o: any) => {
-              const customerInfo: ShippingAddress = {
-                fullName: String(o.customerInfo?.fullName || 'N/A'),
-                email: String(o.customerInfo?.email || 'N/A'),
-                phone: String(o.customerInfo?.phone || 'N/A'),
-                addressLine1: String(o.customerInfo?.addressLine1 || 'N/A'),
-                addressLine2: String(o.customerInfo?.addressLine2 || ''),
-                city: String(o.customerInfo?.city || 'N/A'),
-                state: String(o.customerInfo?.state || 'N/A'),
-                postalCode: String(o.customerInfo?.postalCode || 'N/A'),
-                country: String(o.customerInfo?.country || 'N/A'),
-              };
-
-              const items: CartItem[] = (Array.isArray(o.items) ? o.items : []).map((it: any) => ({
-                id: String(it?.id || `item-id-${Math.random().toString(36).substring(7)}`),
-                name: String(it?.name || 'Unknown Item'),
-                price: Number(it?.price || 0),
-                quantity: Number(it?.quantity || 1),
-                imageUrl: String(it?.imageUrl || 'https://placehold.co/80x80.png'),
-                weight: String(it?.weight || 'N/A'),
-              }));
-
-              const statusHistory: StatusHistoryEntry[] = (Array.isArray(o.statusHistory) ? o.statusHistory : []).map((sh: any) => ({
-                status: sh.status || 'Pending',
-                timestamp: new Date(sh.timestamp || Date.now()),
-                notes: sh.notes,
-              }));
+            if (Array.isArray(parsedData)) {
+              const allOrdersFromStorage: any[] = parsedData;
               
-              return {
-                id: String(o.id || `order-id-${Math.random().toString(36).substring(7)}`),
-                customerInfo,
-                items,
-                subtotal: Number(o.subtotal || 0),
-                shippingCost: Number(o.shippingCost || 0),
-                totalAmount: Number(o.totalAmount || 0),
-                status: o.status || 'Pending',
-                paymentStatus: o.paymentStatus || 'Pending',
-                createdAt: new Date(o.createdAt || Date.now()),
-                updatedAt: new Date(o.updatedAt || Date.now()),
-                statusHistory,
-                itemSummary: String(o.itemSummary || items.map(item => `${item.name} (x${item.quantity})`).join(', ')),
-                userId: o.userId,
-              };
-            });
-            foundOrder = mappedOrders.find(o => o.id === orderId);
+              const mappedOrders: Order[] = allOrdersFromStorage.map((o: any) => {
+                const customerInfo: ShippingAddress = {
+                  fullName: String(o?.customerInfo?.fullName || 'N/A'),
+                  email: String(o?.customerInfo?.email || 'N/A'),
+                  phone: String(o?.customerInfo?.phone || 'N/A'),
+                  addressLine1: String(o?.customerInfo?.addressLine1 || 'N/A'),
+                  addressLine2: String(o?.customerInfo?.addressLine2 || ''),
+                  city: String(o?.customerInfo?.city || 'N/A'),
+                  state: String(o?.customerInfo?.state || 'N/A'),
+                  postalCode: String(o?.customerInfo?.postalCode || 'N/A'),
+                  country: String(o?.customerInfo?.country || 'India'), // Default to India
+                };
 
+                const items: CartItem[] = (Array.isArray(o?.items) ? o.items : []).map((it: any) => ({
+                  id: String(it?.id || `item-id-${Math.random().toString(36).substring(7)}`),
+                  name: String(it?.name || 'Unknown Item'),
+                  price: Number(it?.price || 0),
+                  quantity: Number(it?.quantity || 1),
+                  imageUrl: String(it?.imageUrl || 'https://placehold.co/80x80.png'),
+                  weight: String(it?.weight || 'N/A'),
+                }));
+
+                const statusHistory: StatusHistoryEntry[] = (Array.isArray(o?.statusHistory) ? o.statusHistory : []).map((sh: any) => ({
+                  status: sh?.status || 'Pending',
+                  timestamp: new Date(sh?.timestamp || Date.now()),
+                  notes: sh?.notes,
+                }));
+                
+                return {
+                  id: String(o?.id || `order-id-${Math.random().toString(36).substring(7)}`),
+                  customerInfo,
+                  items,
+                  subtotal: Number(o?.subtotal || 0),
+                  shippingCost: Number(o?.shippingCost || 0),
+                  totalAmount: Number(o?.totalAmount || 0),
+                  status: o?.status || 'Pending',
+                  paymentStatus: o?.paymentStatus || 'Pending',
+                  createdAt: new Date(o?.createdAt || Date.now()),
+                  updatedAt: new Date(o?.updatedAt || Date.now()),
+                  statusHistory,
+                  itemSummary: String(o?.itemSummary || items.map(item => `${item.name} (x${item.quantity})`).join(', ')),
+                  userId: String(o?.userId || ''),
+                };
+              });
+              foundOrder = mappedOrders.find(o => o.id === orderId);
+            } else {
+              console.warn("Data in 'userMockOrders' from localStorage was not an array. Using fallback.");
+            }
           } catch (e) {
             console.error("Error parsing user orders from localStorage or mapping data", e);
           }
@@ -142,7 +149,7 @@ export default function UserOrderDetailPage() {
       if (foundOrder) {
         setOrder(foundOrder);
       } else {
-        console.warn(`Order ${orderId} not found in mock storage. Displaying fallback.`);
+        console.warn(`Order ${orderId} not found in mock storage or parsing failed. Displaying fallback.`);
         setOrder(generateFallbackOrder(orderId));
       }
       setIsLoading(false);
@@ -362,3 +369,4 @@ export default function UserOrderDetailPage() {
   );
 }
 
+    
