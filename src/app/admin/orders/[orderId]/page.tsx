@@ -85,10 +85,10 @@ export default function AdminOrderDetailPage() {
               <CardHeader>
                 <CardTitle>Order Status</CardTitle>
               </CardHeader>
-              <CardContent className="space-y-2">
-                 <p>Current Status: <Badge variant={mockOrder.status === 'Processing' ? 'secondary' : 'default'}>{mockOrder.status}</Badge></p>
-                 <p>Payment: <Badge variant={mockOrder.paymentStatus === 'Paid' ? 'default' : 'destructive'} className={mockOrder.paymentStatus === 'Paid' ? 'bg-green-500 text-white' : ''}>{mockOrder.paymentStatus}</Badge></p>
-                 <p className="text-sm text-muted-foreground">Order Date: {mockOrder.date}</p>
+              <CardContent className="space-y-2 text-sm">
+                 <div className="flex items-center gap-1.5">Current Status: <Badge variant={mockOrder.status === 'Processing' ? 'secondary' : 'default'}>{mockOrder.status}</Badge></div>
+                 <div className="flex items-center gap-1.5">Payment: <Badge variant={mockOrder.paymentStatus === 'Paid' ? 'default' : 'destructive'} className={mockOrder.paymentStatus === 'Paid' ? 'bg-green-500 text-white' : ''}>{mockOrder.paymentStatus}</Badge></div>
+                 <p className="text-muted-foreground">Order Date: {mockOrder.date}</p>
               </CardContent>
             </Card>
           </div>
