@@ -2,9 +2,10 @@
 "use client";
 
 import Link from 'next/link';
-import { ShoppingBag, User, LogIn, LogOut, ChefHat, ShieldCheck, Settings, ListOrdered } from 'lucide-react';
+import { ShoppingBag, User, LogIn, LogOut, ChefHat, ShieldCheck, Settings, ListOrdered, Heart } from 'lucide-react'; // Added Heart
 import { useCart } from '@/context/cart-context';
 import { useAuth } from '@/context/auth-provider';
+import { useWishlist } from '@/context/wishlist-context'; // Added useWishlist
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -17,9 +18,15 @@ import {
 } from "@/components/ui/dropdown-menu"
 
 export function Header() {
-  const { getCartItemCount, isCartReady } = useCart();
-  const { user, logout, loading } = useAuth();
+  const { getCartItemCount, isCartReady: isCartContextReady } = useCart(); // Renamed for clarity
+  const { user, logout, loading: authLoading } = useAuth(); // Renamed for clarity
+  const { wishlistItems, isWishlistReady: isWishlistContextReady } = useWishlist(); // Renamed for clarity
+
+  const isCartReady = isCartContextReady;
+  const isWishlistReady = isWishlistContextReady;
+  
   const cartItemCount = isCartReady ? getCartItemCount() : 0;
+  const wishlistItemCount = isWishlistReady ? wishlistItems.length : 0;
 
   return (
     <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
@@ -37,8 +44,8 @@ export function Header() {
           </Link>
           
           {user && (
-            <Link href="/profile/orders" className="text-sm font-medium text-foreground/70 hover:text-foreground transition-colors flex items-center gap-1">
-               <ListOrdered className="h-5 w-5 md:hidden lg:inline-block" />
+            <Link href="/profile/orders" className="text-sm font-medium text-foreground/70 hover:text-foreground transition-colors hidden md:flex items-center gap-1">
+               <ListOrdered className="h-5 w-5 " />
               My Orders
             </Link>
           )}
@@ -64,6 +71,16 @@ export function Header() {
             </DropdownMenu>
           )}
 
+          <Link href="/wishlist" className="relative flex items-center text-sm font-medium text-foreground/70 hover:text-foreground transition-colors">
+            <Heart className="h-5 w-5" />
+            <span className="sr-only">Wishlist</span>
+            {isWishlistReady && wishlistItemCount > 0 && (
+              <Badge variant="secondary" className="absolute -top-2 -right-3 h-5 w-5 p-0 flex items-center justify-center text-xs rounded-full text-accent-foreground bg-accent">
+                {wishlistItemCount}
+              </Badge>
+            )}
+          </Link>
+
           <Link href="/cart" className="relative flex items-center text-sm font-medium text-foreground/70 hover:text-foreground transition-colors">
             <ShoppingBag className="h-5 w-5" />
             <span className="sr-only">Cart</span>
@@ -74,7 +91,7 @@ export function Header() {
             )}
           </Link>
           
-          {!loading && (
+          {!authLoading && (
             user ? (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
@@ -87,6 +104,12 @@ export function Header() {
                   <Link href="/profile/settings" passHref legacyBehavior>
                     <DropdownMenuItem asChild>
                       <a><Settings className="mr-2 h-4 w-4" />My Account</a>
+                    </DropdownMenuItem>
+                  </Link>
+                   {/* My Orders link for mobile, visible in dropdown */}
+                  <Link href="/profile/orders" passHref legacyBehavior>
+                    <DropdownMenuItem asChild className="md:hidden">
+                      <a><ListOrdered className="mr-2 h-4 w-4" />My Orders</a>
                     </DropdownMenuItem>
                   </Link>
                   <DropdownMenuSeparator />
@@ -105,8 +128,8 @@ export function Header() {
               </Link>
             )
           )}
-          {loading && (
-             <div className="h-8 w-20 bg-muted rounded animate-pulse"></div> // Skeleton for user button
+          {authLoading && (
+             <div className="h-8 w-20 bg-muted rounded animate-pulse"></div> 
           )}
         </nav>
       </div>
