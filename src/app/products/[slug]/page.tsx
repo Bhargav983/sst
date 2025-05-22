@@ -10,7 +10,7 @@ import type { Product, ProductImage } from '@/types';
 import { Button } from '@/components/ui/button';
 import { useCart } from '@/context/cart-context';
 import { QuantitySelector } from '@/components/quantity-selector';
-import { AlertTriangle, ShoppingCart } from 'lucide-react';
+import { AlertTriangle, ShoppingCart, Zap } from 'lucide-react'; // Added Zap for Buy Now
 import { Card, CardContent } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
@@ -65,6 +65,18 @@ export default function ProductDetailPage() {
         title: "Added to cart!",
         description: `${product.name} (x${quantity}) has been added to your cart.`,
       });
+    }
+  };
+
+  const handleBuyNow = () => {
+    if (product) {
+      const cartProductImage = product.images[0]?.url || 'https://placehold.co/100x100.png';
+      addToCart(
+        { ...product, imageUrl: cartProductImage },
+        quantity
+      );
+      // No toast here, directly redirect
+      router.push('/checkout');
     }
   };
 
@@ -217,10 +229,15 @@ export default function ProductDetailPage() {
             </CardContent>
           </Card>
 
-          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 mb-4">
             <QuantitySelector quantity={quantity} onQuantityChange={setQuantity} />
-            <Button size="lg" onClick={handleAddToCart} className="w-full sm:w-auto shadow-md">
+          </div>
+          <div className="flex flex-col sm:flex-row items-center gap-3">
+             <Button size="lg" onClick={handleAddToCart} className="w-full sm:w-auto shadow-md flex-1 sm:flex-none">
               <ShoppingCart className="mr-2 h-5 w-5" /> Add to Cart
+            </Button>
+            <Button size="lg" onClick={handleBuyNow} variant="default" className="w-full sm:w-auto shadow-md flex-1 sm:flex-none bg-accent hover:bg-accent/90 text-accent-foreground">
+              <Zap className="mr-2 h-5 w-5" /> Buy Now
             </Button>
           </div>
         </div>
