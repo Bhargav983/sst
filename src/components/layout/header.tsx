@@ -36,6 +36,12 @@ export function Header() {
             Products
           </Link>
           
+          {user && (
+            <Link href="/profile/orders" className="text-sm font-medium text-foreground/70 hover:text-foreground transition-colors">
+              My Orders
+            </Link>
+          )}
+          
           {user && user.isAdmin && (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -79,13 +85,11 @@ export function Header() {
                 <DropdownMenuContent align="end">
                   <DropdownMenuLabel>My Account</DropdownMenuLabel>
                   <DropdownMenuSeparator />
-                  <Link href="/profile/orders" passHref legacyBehavior>
-                     <DropdownMenuItem asChild><a><ListOrdered className="mr-2 h-4 w-4" />My Orders</a></DropdownMenuItem>
-                  </Link>
+                  {/* My Orders link removed from here */}
                   {/* <Link href="/profile/settings" passHref legacyBehavior>
                     <DropdownMenuItem asChild><a><Settings className="mr-2 h-4 w-4" />Settings</a></DropdownMenuItem>
                   </Link> */}
-                  <DropdownMenuSeparator />
+                  {/* If other profile links were needed, they would go here or below the separator */}
                   <DropdownMenuItem onClick={logout}>
                     <LogOut className="mr-2 h-4 w-4" />
                     Logout
