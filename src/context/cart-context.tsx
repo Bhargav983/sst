@@ -2,14 +2,14 @@
 "use client";
 
 import React, { createContext, ReactNode, useEffect } from 'react';
-import type { Product, CartItem } from '@/types'; // Product type is needed for addToCart
+import type { Product, CartItem, ProductVariant } from '@/types';
 import useLocalStorage from '@/hooks/use-local-storage';
 
 interface CartContextType {
   cartItems: CartItem[];
-  addToCart: (product: Product & { imageUrl: string }, quantity: number) => void; // Modified Product type
-  removeFromCart: (productId: string) => void;
-  updateQuantity: (productId: string, quantity: number) => void;
+  addToCart: (product: Product, quantity: number, selectedVariant: ProductVariant) => void;
+  removeFromCart: (productId: string, variantSku?: string) => void; // Allow removing specific variant if Sku is used
+  updateQuantity: (productId: string, newQuantity: number, variantSku?: string) => void;
   clearCart: () => void;
   getCartTotal: () => number;
   getCartItemCount: () => number;
@@ -26,45 +26,70 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
     setIsCartReady(true);
   }, []);
 
-  // Product for addToCart now expects an imageUrl directly, 
-  // as Product type itself might not have a single imageUrl after recent changes.
-  const addToCart = (product: Product & { imageUrl: string }, quantity: number) => {
-    if (quantity <= 0) return;
+  const addToCart = (product: Product, quantity: number, selectedVariant: ProductVariant) => {
+    if (quantity <= 0 || !selectedVariant) return;
     setCartItems(prevItems => {
-      const existingItem = prevItems.find(item => item.id === product.id);
+      // If variants have unique SKUs, use that for existing item check. Otherwise, product ID + weight.
+      const itemIdentifier = selectedVariant.sku || `${product.id}-${selectedVariant.weight}`;
+      const existingItem = prevItems.find(item => (item.variantSku || `${item.id}-${item.weight}`) === itemIdentifier);
+
       if (existingItem) {
         return prevItems.map(item =>
-          item.id === product.id
+          (item.variantSku || `${item.id}-${item.weight}`) === itemIdentifier
             ? { ...item, quantity: item.quantity + quantity }
             : item
         );
       }
       return [...prevItems, { 
         id: product.id, 
+        variantSku: selectedVariant.sku,
         name: product.name, 
-        price: product.price, 
+        price: selectedVariant.price, 
         quantity, 
-        imageUrl: product.imageUrl, // Use the passed imageUrl
-        weight: product.weight
+        imageUrl: product.images[0]?.url || 'https://placehold.co/100x100.png', // Default image
+        weight: selectedVariant.weight
       }];
     });
   };
 
-  const removeFromCart = (productId: string) => {
-    setCartItems(prevItems => prevItems.filter(item => item.id !== productId));
+  const removeFromCart = (productId: string, variantSku?: string) => {
+    setCartItems(prevItems => prevItems.filter(item => {
+      if (variantSku) return item.variantSku !== variantSku; // If Sku provided, match only Sku
+      if (item.variantSku) return item.id !== productId; // If item has Sku but no Sku provided for removal, don't remove unless ID matches (should be more specific)
+      return item.id !== productId; // Fallback for items without Sku (might remove all variants of a product)
+      // For more precise removal without SKU, you'd need to pass weight or another identifier.
+      // For now, this prioritizes SKU if available.
+    }));
   };
-
-  const updateQuantity = (productId: string, quantity: number) => {
-    if (quantity <= 0) {
-      removeFromCart(productId);
+  
+  // Simplified updateQuantity for this iteration, might need SKU for more specific variant updates
+  const updateQuantity = (productId: string, newQuantity: number, variantSku?: string) => {
+     const itemIdentifier = variantSku || productId; // Simplified identifier
+     if (newQuantity <= 0) {
+      // This removal logic needs to be more precise if multiple variants of same product ID exist
+      // For now, if SKU is passed, it will try to remove that specific SKU
+      // Otherwise, it might remove all items matching productId if no SKU
+      setCartItems(prevItems => prevItems.filter(item => 
+          (variantSku && item.variantSku === variantSku) ? false :
+          (!variantSku && item.id === productId) ? false :
+          true
+      ));
       return;
     }
+
     setCartItems(prevItems =>
-      prevItems.map(item =>
-        item.id === productId ? { ...item, quantity } : item
-      )
+      prevItems.map(item => {
+        const currentItemIdentifier = item.variantSku || `${item.id}-${item.weight}`;
+        const targetIdentifier = variantSku || `${productId}-${item.weight}`; // Attempt to match by sku or id+weight
+
+        if (currentItemIdentifier === targetIdentifier) {
+          return { ...item, quantity: newQuantity };
+        }
+        return item;
+      })
     );
   };
+
 
   const clearCart = () => {
     setCartItems([]);
@@ -79,7 +104,6 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
   };
   
   if (!isCartReady) {
-    // You can return a loader here if needed, or null
     return null; 
   }
 

@@ -29,7 +29,7 @@ export function CartItemDisplay({ item }: CartItemDisplayProps) {
           width={100}
           height={100}
           className="rounded-md object-cover aspect-square border"
-          data-ai-hint={productDetails?.dataAiHint || 'cart item'}
+          data-ai-hint={productDetails?.images[0]?.dataAiHint || 'cart item'}
         />
       </Link>
       <div className="flex-grow">
@@ -41,7 +41,7 @@ export function CartItemDisplay({ item }: CartItemDisplayProps) {
         <div className="mt-2">
           <QuantitySelector
             quantity={item.quantity}
-            onQuantityChange={(newQuantity) => updateQuantity(item.id, newQuantity)}
+            onQuantityChange={(newQuantity) => updateQuantity(item.id, newQuantity, item.variantSku)}
           />
         </div>
       </div>
@@ -50,9 +50,9 @@ export function CartItemDisplay({ item }: CartItemDisplayProps) {
         <Button
           variant="ghost"
           size="icon"
-          onClick={() => removeFromCart(item.id)}
+          onClick={() => removeFromCart(item.id, item.variantSku)}
           className="text-muted-foreground hover:text-destructive"
-          aria-label={`Remove ${item.name} from cart`}
+          aria-label={`Remove ${item.name} (${item.weight}) from cart`}
         >
           <Trash2 className="h-5 w-5" />
         </Button>

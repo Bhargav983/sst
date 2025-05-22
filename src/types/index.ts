@@ -4,32 +4,40 @@ export interface ProductImage {
   dataAiHint?: string;
 }
 
+export interface ProductVariant {
+  weight: string; // e.g., "100g", "250g", "500ml"
+  price: number;
+  pricePerUnit?: string; // e.g., "(₹5.99 / 100g)" - Calculated
+  sku?: string; // Optional Stock Keeping Unit for the variant
+}
+
 export interface Product {
   id: string;
   name: string;
   slug: string;
   description: string;
   longDescription?: string;
-  price: number;
-  weight: string;
   images: ProductImage[];
   category?: string;
+  variants: ProductVariant[];
+  defaultVariantIndex: number; // Index of the default variant in the 'variants' array
 }
 
 export interface CartItem {
-  id: string;
+  id: string; // Corresponds to Product.id
+  variantSku?: string; // Optional: If variants have SKUs, store it
   name: string;
-  price: number;
+  price: number; // Price of the specific variant added
   quantity: number;
   imageUrl: string;
-  weight: string;
+  weight: string; // Weight of the specific variant added
 }
 
 export interface ShippingAddress {
-  id?: string; // Made optional for new addresses, will be assigned when saved
-  label?: string; // e.g., "Home", "Work"
+  id?: string;
+  label?: string;
   fullName: string;
-  email: string; // Kept for guest checkout or if primary email differs
+  email: string;
   phone: string;
   addressLine1: string;
   addressLine2?: string;
@@ -67,5 +75,5 @@ export interface AppUser {
   displayName?: string | null;
   phone?: string | null;
   isAdmin?: boolean;
-  addresses?: ShippingAddress[]; // Array of saved addresses
+  addresses?: ShippingAddress[];
 }

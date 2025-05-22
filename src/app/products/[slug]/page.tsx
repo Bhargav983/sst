@@ -6,20 +6,20 @@ import { useParams, useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { MainLayout } from '@/components/layout/main-layout';
 import { getProductBySlug } from '@/data/products';
-import type { Product, ProductImage } from '@/types';
+import type { Product, ProductImage, ProductVariant } from '@/types';
 import { Button } from '@/components/ui/button';
 import { useCart } from '@/context/cart-context';
 import { QuantitySelector } from '@/components/quantity-selector';
-import { AlertTriangle, ShoppingCart, Zap } from 'lucide-react'; // Added Zap for Buy Now
+import { AlertTriangle, ShoppingCart, Zap, Weight } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Label } from "@/components/ui/label";
 
-const ZOOM_PANE_WIDTH = 400; // Width of the zoomed image display area
-const ZOOM_PANE_HEIGHT = 300; // Height of the zoomed image display area (maintaining 4:3 aspect ratio)
-const ZOOM_LEVEL = 2.5; // How much to magnify the image
-
-// Derived lens size based on zoom pane and zoom level
+const ZOOM_PANE_WIDTH = 400;
+const ZOOM_PANE_HEIGHT = 300;
+const ZOOM_LEVEL = 2.5;
 const LENS_WIDTH = ZOOM_PANE_WIDTH / ZOOM_LEVEL;
 const LENS_HEIGHT = ZOOM_PANE_HEIGHT / ZOOM_LEVEL;
 
@@ -30,93 +30,91 @@ export default function ProductDetailPage() {
   
   const [product, setProduct] = useState<Product | null>(null);
   const [selectedImage, setSelectedImage] = useState<ProductImage | null>(null);
+  const [selectedVariant, setSelectedVariant] = useState<ProductVariant | null>(null);
   const [quantity, setQuantity] = useState(1);
   const { addToCart } = useCart();
   const { toast } = useToast();
 
   const [showZoom, setShowZoom] = useState(false);
-  const [zoomCoords, setZoomCoords] = useState({ x: 0, y: 0 }); // For backgroundPosition of zoom pane
-  const [lensPositionStyle, setLensPositionStyle] = useState({ top: 0, left: 0 }); // For lens element
+  const [zoomCoords, setZoomCoords] = useState({ x: 0, y: 0 });
+  const [lensPositionStyle, setLensPositionStyle] = useState({ top: 0, left: 0 });
 
   const imageContainerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (slug) {
       const foundProduct = getProductBySlug(slug);
-      if (foundProduct && foundProduct.images && foundProduct.images.length > 0) {
+      if (foundProduct) {
         setProduct(foundProduct);
-        setSelectedImage(foundProduct.images[0]);
+        if (foundProduct.images && foundProduct.images.length > 0) {
+          setSelectedImage(foundProduct.images[0]);
+        }
+        if (foundProduct.variants && foundProduct.variants.length > 0) {
+          setSelectedVariant(foundProduct.variants[foundProduct.defaultVariantIndex || 0]);
+        }
       } else {
-        console.warn(`Product with slug "${slug}" not found or has no images.`);
         setProduct(null);
         setSelectedImage(null);
+        setSelectedVariant(null);
       }
     }
   }, [slug]);
 
-  const handleAddToCart = () => {
-    if (product) {
-      const cartProductImage = product.images[0]?.url || 'https://placehold.co/100x100.png';
-      addToCart(
-        { ...product, imageUrl: cartProductImage },
-        quantity
-      );
-      toast({
-        title: "Added to cart!",
-        description: `${product.name} (x${quantity}) has been added to your cart.`,
-      });
+  const handleVariantChange = (variantSkuOrWeight: string) => {
+    if (product && product.variants) {
+      // Assuming SKU is unique, otherwise match by weight. For simplicity, using weight.
+      const newVariant = product.variants.find(v => v.weight === variantSkuOrWeight || v.sku === variantSkuOrWeight);
+      if (newVariant) {
+        setSelectedVariant(newVariant);
+      }
     }
   };
-
-  const handleBuyNow = () => {
-    if (product) {
+  
+  const handleCartAction = (isBuyNow: boolean) => {
+    if (product && selectedVariant) {
       const cartProductImage = product.images[0]?.url || 'https://placehold.co/100x100.png';
       addToCart(
-        { ...product, imageUrl: cartProductImage },
-        quantity
+        { // Constructing a temporary object that matches Product type for addToCart
+          ...product,
+          price: selectedVariant.price, // Use selected variant's price
+          weight: selectedVariant.weight, // Use selected variant's weight
+          // Ensure other Product fields are present if addToCart relies on them directly
+          // For now, variants and defaultVariantIndex are not used by addToCart's item creation
+          variants: product.variants, 
+          defaultVariantIndex: product.defaultVariantIndex,
+        },
+        quantity,
+        selectedVariant // Pass selected variant for clarity in cart context if needed, or for Sku
       );
-      // No toast here, directly redirect
-      router.push('/checkout');
+      if (!isBuyNow) {
+        toast({
+          title: "Added to cart!",
+          description: `${product.name} (${selectedVariant.weight}) (x${quantity}) has been added.`,
+        });
+      } else {
+        router.push('/checkout');
+      }
     }
   };
 
   const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
     if (!imageContainerRef.current || !selectedImage) return;
-
     const imgContainer = imageContainerRef.current;
     const rect = imgContainer.getBoundingClientRect();
-
-    // Mouse position relative to the image container
     let x = e.clientX - rect.left;
     let y = e.clientY - rect.top;
-
-    // Calculate lens position
     let lensX = x - LENS_WIDTH / 2;
     let lensY = y - LENS_HEIGHT / 2;
-
-    // Constrain lens within image bounds
     lensX = Math.max(0, Math.min(lensX, imgContainer.offsetWidth - LENS_WIDTH));
     lensY = Math.max(0, Math.min(lensY, imgContainer.offsetHeight - LENS_HEIGHT));
     setLensPositionStyle({ top: lensY, left: lensX });
-
-    // Calculate backgroundPosition for zoom pane
-    setZoomCoords({
-      x: -lensX * ZOOM_LEVEL,
-      y: -lensY * ZOOM_LEVEL,
-    });
+    setZoomCoords({ x: -lensX * ZOOM_LEVEL, y: -lensY * ZOOM_LEVEL });
   };
 
-  const handleMouseEnter = () => {
-    if (product && product.images.length > 0) { // Only show zoom if there's an image
-        setShowZoom(true);
-    }
-  };
+  const handleMouseEnter = () => { if (product && product.images.length > 0) setShowZoom(true); };
+  const handleMouseLeave = () => setShowZoom(false);
 
-  const handleMouseLeave = () => {
-    setShowZoom(false);
-  };
-
-  if (!product) { // Simplified loading/not found based on product only
+  if (!product || !selectedVariant) {
     return (
       <MainLayout>
         <div className="flex flex-col items-center justify-center text-center py-10">
@@ -129,16 +127,14 @@ export default function ProductDetailPage() {
     );
   }
   
-  // Ensure selectedImage is valid before trying to use its URL for zoom pane
   const validSelectedImageUrl = selectedImage?.url;
-
 
   return (
     <MainLayout>
       <div className="grid md:grid-cols-2 gap-8 lg:gap-12">
         {/* Image Gallery Section */}
         <div className="flex flex-col gap-4 md:sticky md:top-24 self-start">
-           <div ref={imageContainerRef} className="relative"> {/* Container for main image card and zoom pane */}
+           <div ref={imageContainerRef} className="relative">
             <Card className="overflow-hidden shadow-lg rounded-lg">
               <div
                 className="aspect-[4/3] relative w-full cursor-crosshair"
@@ -157,38 +153,30 @@ export default function ProductDetailPage() {
                     className="rounded-t-lg object-cover"
                   />
                 )}
-                {showZoom && imageContainerRef.current && validSelectedImageUrl && ( // Lens
+                {showZoom && imageContainerRef.current && validSelectedImageUrl && (
                   <div
                     className="absolute border-2 border-primary bg-white/30 pointer-events-none"
                     style={{
-                      width: `${LENS_WIDTH}px`,
-                      height: `${LENS_HEIGHT}px`,
-                      top: `${lensPositionStyle.top}px`,
-                      left: `${lensPositionStyle.left}px`,
+                      width: `${LENS_WIDTH}px`, height: `${LENS_HEIGHT}px`,
+                      top: `${lensPositionStyle.top}px`, left: `${lensPositionStyle.left}px`,
                     }}
                   />
                 )}
               </div>
             </Card>
-            
-            {/* Zoom Pane */}
             {showZoom && validSelectedImageUrl && imageContainerRef.current && (
               <div
                 className="absolute border border-gray-300 shadow-lg hidden md:block bg-no-repeat pointer-events-none z-10"
                 style={{
-                  width: `${ZOOM_PANE_WIDTH}px`,
-                  height: `${ZOOM_PANE_HEIGHT}px`,
+                  width: `${ZOOM_PANE_WIDTH}px`, height: `${ZOOM_PANE_HEIGHT}px`,
                   backgroundImage: `url(${validSelectedImageUrl})`,
                   backgroundSize: `${imageContainerRef.current.offsetWidth * ZOOM_LEVEL}px ${imageContainerRef.current.offsetHeight * ZOOM_LEVEL}px`,
                   backgroundPosition: `${zoomCoords.x}px ${zoomCoords.y}px`,
-                  top: `0px`,
-                  left: `calc(100% + 1rem)`, // Position to the right of the image card container
+                  top: `0px`, left: `calc(100% + 1rem)`,
                 }}
               />
             )}
           </div>
-
-          {/* Thumbnails */}
           {product.images.length > 1 && (
             <div className="grid grid-cols-5 gap-2">
               {product.images.map((image, index) => (
@@ -202,11 +190,8 @@ export default function ProductDetailPage() {
                   aria-label={`View image ${index + 1} of ${product.name}`}
                 >
                   <Image
-                    src={image.url} 
-                    alt={`${product.name} thumbnail ${index + 1}`}
-                    fill
-                    sizes="10vw"
-                    data-ai-hint={image.dataAiHint || `product thumbnail ${index + 1}`}
+                    src={image.url} alt={`${product.name} thumbnail ${index + 1}`}
+                    fill sizes="10vw" data-ai-hint={image.dataAiHint || `product thumbnail ${index + 1}`}
                     className="rounded object-cover"
                   />
                 </button>
@@ -218,8 +203,45 @@ export default function ProductDetailPage() {
         {/* Product Info Section */}
         <div className="flex flex-col justify-center">
           <h1 className="text-3xl lg:text-4xl font-bold text-primary mb-3">{product.name}</h1>
-          <p className="text-xl font-semibold text-foreground mb-3">₹{product.price.toFixed(2)}</p>
-          <p className="text-md text-muted-foreground mb-1">Weight: {product.weight}</p>
+          
+          <div className="mb-4">
+            <p className="text-2xl font-semibold text-foreground">₹{selectedVariant.price.toFixed(2)}</p>
+            {selectedVariant.pricePerUnit && <p className="text-sm text-muted-foreground">{selectedVariant.pricePerUnit}</p>}
+          </div>
+
+          {/* Variant Selection */}
+          {product.variants.length > 1 && (
+            <Card className="mb-6 shadow rounded-lg">
+              <CardContent className="p-4">
+                <Label className="text-md font-semibold mb-2 block flex items-center gap-2"><Weight className="h-5 w-5 text-muted-foreground" />Select Weight:</Label>
+                <RadioGroup
+                  value={selectedVariant.sku || selectedVariant.weight}
+                  onValueChange={handleVariantChange}
+                  className="flex flex-wrap gap-3"
+                >
+                  {product.variants.map((variant) => (
+                    <Label
+                      key={variant.sku || variant.weight}
+                      htmlFor={variant.sku || variant.weight}
+                      className={cn(
+                        "flex items-center justify-center rounded-md border px-4 py-2 text-sm font-medium cursor-pointer transition-colors hover:bg-accent/80",
+                        (selectedVariant.sku === variant.sku || selectedVariant.weight === variant.weight)
+                          ? "bg-primary text-primary-foreground border-primary ring-2 ring-primary ring-offset-2"
+                          : "bg-background hover:bg-accent"
+                      )}
+                    >
+                      <RadioGroupItem value={variant.sku || variant.weight} id={variant.sku || variant.weight} className="sr-only" />
+                      {variant.weight}
+                    </Label>
+                  ))}
+                </RadioGroup>
+              </CardContent>
+            </Card>
+          )}
+          {!product.variants.length && (
+             <p className="text-md text-muted-foreground mb-1">Weight: {selectedVariant.weight}</p>
+          )}
+          
           {product.category && <p className="text-sm text-accent mb-4">Category: {product.category}</p>}
           
           <Card className="bg-secondary/30 mb-6 shadow rounded-lg">
@@ -233,10 +255,10 @@ export default function ProductDetailPage() {
             <QuantitySelector quantity={quantity} onQuantityChange={setQuantity} />
           </div>
           <div className="flex flex-col sm:flex-row items-center gap-3">
-             <Button size="lg" onClick={handleAddToCart} className="w-full sm:w-auto shadow-md flex-1 sm:flex-none">
+             <Button size="lg" onClick={() => handleCartAction(false)} className="w-full sm:w-auto shadow-md flex-1 sm:flex-none">
               <ShoppingCart className="mr-2 h-5 w-5" /> Add to Cart
             </Button>
-            <Button size="lg" onClick={handleBuyNow} variant="default" className="w-full sm:w-auto shadow-md flex-1 sm:flex-none bg-accent hover:bg-accent/90 text-accent-foreground">
+            <Button size="lg" onClick={() => handleCartAction(true)} variant="default" className="w-full sm:w-auto shadow-md flex-1 sm:flex-none bg-accent hover:bg-accent/90 text-accent-foreground">
               <Zap className="mr-2 h-5 w-5" /> Buy Now
             </Button>
           </div>
