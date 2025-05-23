@@ -52,6 +52,7 @@ const bulkInquirySchema = z.object({
   productSelections: productSelectionSchema,
   quantitiesPerVariant: z.record(z.string(), quantityInputSchema), // Key: variant.sku, Value: quantity string
   shippingAddressCity: z.string().optional(),
+  shippingPincode: z.string().optional(), // Added pincode
   additionalMessage: z.string().max(500, { message: "Message cannot exceed 500 characters."}).optional(),
 }).refine(data => {
   const selectedProductIds = Object.keys(data.productSelections).filter(id => data.productSelections[id]);
@@ -103,6 +104,7 @@ export default function BulkOrderInquiryPage() {
       productSelections: defaultProductSelections,
       quantitiesPerVariant: {},
       shippingAddressCity: '',
+      shippingPincode: '', // Added pincode
       additionalMessage: '',
     },
   });
@@ -137,6 +139,7 @@ export default function BulkOrderInquiryPage() {
       productsOfInterest: selectedProductsOutput,
       quantitiesPerVariant: quantitiesOutput,
       shippingAddressCity: data.shippingAddressCity,
+      shippingPincode: data.shippingPincode, // Added pincode
       additionalMessage: data.additionalMessage,
     };
 
@@ -276,9 +279,15 @@ export default function BulkOrderInquiryPage() {
                 )}
                 
                 {/* Other Fields */}
-                <FormField control={form.control} name="shippingAddressCity" render={({ field }) => (
-                    <FormItem><FormLabel>Shipping City/Region (Optional)</FormLabel><FormControl><Input placeholder="e.g., Bangalore, Karnataka" {...field} /></FormControl><FormMessage /></FormItem>
-                )}/>
+                 <div className="grid sm:grid-cols-2 gap-6">
+                    <FormField control={form.control} name="shippingAddressCity" render={({ field }) => (
+                        <FormItem><FormLabel>Shipping City/Region (Optional)</FormLabel><FormControl><Input placeholder="e.g., Bangalore, Karnataka" {...field} /></FormControl><FormMessage /></FormItem>
+                    )}/>
+                    <FormField control={form.control} name="shippingPincode" render={({ field }) => (
+                        <FormItem><FormLabel>Shipping Pincode (Optional)</FormLabel><FormControl><Input placeholder="e.g., 560001" {...field} /></FormControl><FormMessage /></FormItem>
+                    )}/>
+                </div>
+
                 <FormField control={form.control} name="additionalMessage" render={({ field }) => (
                     <FormItem><FormLabel>Additional Message (Optional)</FormLabel><FormControl><Textarea placeholder="Any specific requirements or questions?" {...field} rows={4}/></FormControl><FormMessage /></FormItem>
                 )}/>
