@@ -15,19 +15,27 @@ export const calculatePricePerUnit = (price: number, weightString: string, unitW
 
 const generateVariants = (basePrice: number, baseWeight: number, weights: number[]): ProductVariant[] => {
   return weights.map((w, index) => {
-    const priceMultiplier = w / baseWeight;
-    const retailPrice = parseFloat((basePrice * Math.pow(priceMultiplier, 0.85)).toFixed(2));
+    // Adjusted price calculation: make it less aggressive for smaller packs,
+    // or ensure basePrice itself is representative of the smallest pack.
+    // Let's assume basePrice is for baseWeight, and scale more linearly but with some curve.
+    let priceMultiplier = w / baseWeight;
+    if (w < baseWeight) {
+      priceMultiplier = Math.pow(priceMultiplier, 0.9); // Less steep discount for smaller packs relative to base
+    } else if (w > baseWeight) {
+      priceMultiplier = Math.pow(priceMultiplier, 0.95); // Less steep premium for larger packs relative to base
+    }
+
+    const retailPrice = parseFloat((basePrice * priceMultiplier).toFixed(2));
     const weightStr = `${w}g`;
 
     // Wholesale specific logic
-    // Example: larger packs have smaller min qty for wholesale, smaller packs might have higher min qty
     let wholesaleMinQuantity;
     if (w <= 100) {
-      wholesaleMinQuantity = 10; // Min 10 units for 100g packs
+      wholesaleMinQuantity = 10; 
     } else if (w <= 250) {
-      wholesaleMinQuantity = 5;  // Min 5 units for 250g packs
+      wholesaleMinQuantity = 5;  
     } else {
-      wholesaleMinQuantity = 3;  // Min 3 units for 500g+ packs
+      wholesaleMinQuantity = 3;  
     }
     const wholesalePrice = parseFloat((retailPrice * 0.85).toFixed(2)); // 15% discount for wholesale
 
@@ -35,7 +43,7 @@ const generateVariants = (basePrice: number, baseWeight: number, weights: number
       weight: weightStr,
       price: retailPrice,
       pricePerUnit: calculatePricePerUnit(retailPrice, weightStr),
-      sku: `SKU-${baseWeight}-${w}-${index}`,
+      sku: `SKU-${baseWeight}-${w}-${index}`, // Using baseWeight in SKU for clarity
       wholesalePrice: wholesalePrice,
       wholesaleMinQuantity: wholesaleMinQuantity,
     };
@@ -59,7 +67,8 @@ export const products: Product[] = [
     ],
     category: 'Spicy',
     defaultVariantIndex: 1, // 250g
-    variants: generateVariants(12.99, 250, [100, 250, 500]),
+    // Assuming 100g as base weight for price reference
+    variants: generateVariants(450, 100, [100, 250, 500]), 
   },
   {
     id: '2',
@@ -76,7 +85,7 @@ export const products: Product[] = [
     ],
     category: 'Mild',
     defaultVariantIndex: 1, // 250g
-    variants: generateVariants(14.50, 250, [100, 250, 450]),
+    variants: generateVariants(520, 100, [100, 250, 450]),
   },
   {
     id: '3',
@@ -92,8 +101,8 @@ export const products: Product[] = [
       { url: 'https://placehold.co/100x100.png', dataAiHint: 'tamarind paste usage' }
     ],
     category: 'Tangy',
-    defaultVariantIndex: 0, // 200g
-    variants: generateVariants(10.99, 200, [200, 400]),
+    defaultVariantIndex: 0, // 200g, let's make 100g base
+    variants: generateVariants(400, 100, [100, 200, 400]),
   },
   {
     id: '4',
@@ -109,8 +118,8 @@ export const products: Product[] = [
       { url: 'https://placehold.co/100x100.png', dataAiHint: 'garlic paste cooking' }
     ],
     category: 'Aromatic',
-    defaultVariantIndex: 0, // 200g
-    variants: generateVariants(9.99, 200, [200, 350, 600]),
+    defaultVariantIndex: 0, // 200g, let's make 100g base
+    variants: generateVariants(430, 100, [100, 200, 350, 600]), 
   },
 ];
 
