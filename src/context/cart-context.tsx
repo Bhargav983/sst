@@ -4,11 +4,12 @@
 import React, { createContext, ReactNode, useEffect } from 'react';
 import type { Product, CartItem, ProductVariant } from '@/types';
 import useLocalStorage from '@/hooks/use-local-storage';
+import { useAuth } from './auth-provider'; // Removed import as it's not used directly here after wholesale removal
 
 interface CartContextType {
   cartItems: CartItem[];
   addToCart: (product: Product, quantity: number, selectedVariant: ProductVariant) => void;
-  removeFromCart: (productId: string, variantSku?: string) => void; // Allow removing specific variant if Sku is used
+  removeFromCart: (productId: string, variantSku?: string) => void; 
   updateQuantity: (productId: string, newQuantity: number, variantSku?: string) => void;
   clearCart: () => void;
   getCartTotal: () => number;
@@ -28,15 +29,17 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
 
   const addToCart = (product: Product, quantity: number, selectedVariant: ProductVariant) => {
     if (quantity <= 0 || !selectedVariant) return;
+
     setCartItems(prevItems => {
-      // If variants have unique SKUs, use that for existing item check. Otherwise, product ID + weight.
       const itemIdentifier = selectedVariant.sku || `${product.id}-${selectedVariant.weight}`;
       const existingItem = prevItems.find(item => (item.variantSku || `${item.id}-${item.weight}`) === itemIdentifier);
+      
+      const priceToUse = selectedVariant.price; // Always use retail price now
 
       if (existingItem) {
         return prevItems.map(item =>
           (item.variantSku || `${item.id}-${item.weight}`) === itemIdentifier
-            ? { ...item, quantity: item.quantity + quantity }
+            ? { ...item, quantity: item.quantity + quantity, price: priceToUse } // Ensure price is updated if it could change
             : item
         );
       }
@@ -44,52 +47,45 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
         id: product.id, 
         variantSku: selectedVariant.sku,
         name: product.name, 
-        price: selectedVariant.price, 
+        price: priceToUse, 
         quantity, 
-        imageUrl: product.images[0]?.url || 'https://placehold.co/100x100.png', // Default image
-        weight: selectedVariant.weight
+        imageUrl: product.images[0]?.url || 'https://placehold.co/100x100.png',
+        weight: selectedVariant.weight,
+        originalRetailPrice: selectedVariant.price, // Store original retail for reference
       }];
     });
   };
 
   const removeFromCart = (productId: string, variantSku?: string) => {
     setCartItems(prevItems => prevItems.filter(item => {
-      if (variantSku) return item.variantSku !== variantSku; // If Sku provided, match only Sku
-      if (item.variantSku) return item.id !== productId; // If item has Sku but no Sku provided for removal, don't remove unless ID matches (should be more specific)
-      return item.id !== productId; // Fallback for items without Sku (might remove all variants of a product)
-      // For more precise removal without SKU, you'd need to pass weight or another identifier.
-      // For now, this prioritizes SKU if available.
+      const itemIdentifier = item.variantSku || `${item.id}-${item.weight}`;
+      const targetIdentifier = variantSku || `${productId}-${item.weight}`; // Construct similar identifier for target
+      if(variantSku){
+        return item.variantSku !== variantSku;
+      }
+      return itemIdentifier !== targetIdentifier;
     }));
   };
   
-  // Simplified updateQuantity for this iteration, might need SKU for more specific variant updates
   const updateQuantity = (productId: string, newQuantity: number, variantSku?: string) => {
-     const itemIdentifier = variantSku || productId; // Simplified identifier
      if (newQuantity <= 0) {
-      // This removal logic needs to be more precise if multiple variants of same product ID exist
-      // For now, if SKU is passed, it will try to remove that specific SKU
-      // Otherwise, it might remove all items matching productId if no SKU
-      setCartItems(prevItems => prevItems.filter(item => 
-          (variantSku && item.variantSku === variantSku) ? false :
-          (!variantSku && item.id === productId) ? false :
-          true
-      ));
+      removeFromCart(productId, variantSku);
       return;
     }
 
     setCartItems(prevItems =>
       prevItems.map(item => {
         const currentItemIdentifier = item.variantSku || `${item.id}-${item.weight}`;
-        const targetIdentifier = variantSku || `${productId}-${item.weight}`; // Attempt to match by sku or id+weight
+        const targetIdentifier = variantSku || `${productId}-${item.weight}`; 
 
         if (currentItemIdentifier === targetIdentifier) {
-          return { ...item, quantity: newQuantity };
+          const priceToUse = item.originalRetailPrice || item.price; // Use stored original retail price
+          return { ...item, quantity: newQuantity, price: priceToUse };
         }
         return item;
       })
     );
   };
-
 
   const clearCart = () => {
     setCartItems([]);

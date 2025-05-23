@@ -1,6 +1,6 @@
 
 import Link from 'next/link';
-import { Mail, Phone, MapPin, Facebook, Instagram, Twitter, ChefHat, FileText, Info, MessageSquare } from 'lucide-react'; // Added icons
+import { Mail, Phone, MapPin, Facebook, Instagram, Twitter, ChefHat, FileText, Info, MessageSquare, Package } from 'lucide-react'; // Added Package
 
 export function Footer() {
   return (
@@ -52,6 +52,11 @@ export function Footer() {
                 </p>
               </div>
             </address>
+             <div className="pt-2">
+                <Link href="/bulk-order-inquiry" className="text-sm text-primary hover:underline flex items-center gap-1.5">
+                    <Package size={16}/> Bulk Order Inquiries
+                </Link>
+            </div>
           </div>
 
           {/* Column 4: Legal & Follow Us */}

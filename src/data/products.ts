@@ -15,37 +15,21 @@ export const calculatePricePerUnit = (price: number, weightString: string, unitW
 
 const generateVariants = (basePrice: number, baseWeight: number, weights: number[]): ProductVariant[] => {
   return weights.map((w, index) => {
-    // Adjusted price calculation: make it less aggressive for smaller packs,
-    // or ensure basePrice itself is representative of the smallest pack.
-    // Let's assume basePrice is for baseWeight, and scale more linearly but with some curve.
     let priceMultiplier = w / baseWeight;
     if (w < baseWeight) {
-      priceMultiplier = Math.pow(priceMultiplier, 0.9); // Less steep discount for smaller packs relative to base
+      priceMultiplier = Math.pow(priceMultiplier, 0.9); 
     } else if (w > baseWeight) {
-      priceMultiplier = Math.pow(priceMultiplier, 0.95); // Less steep premium for larger packs relative to base
+      priceMultiplier = Math.pow(priceMultiplier, 0.95); 
     }
 
     const retailPrice = parseFloat((basePrice * priceMultiplier).toFixed(2));
     const weightStr = `${w}g`;
 
-    // Wholesale specific logic
-    let wholesaleMinQuantity;
-    if (w <= 100) {
-      wholesaleMinQuantity = 10; 
-    } else if (w <= 250) {
-      wholesaleMinQuantity = 5;  
-    } else {
-      wholesaleMinQuantity = 3;  
-    }
-    const wholesalePrice = parseFloat((retailPrice * 0.85).toFixed(2)); // 15% discount for wholesale
-
     return {
       weight: weightStr,
       price: retailPrice,
       pricePerUnit: calculatePricePerUnit(retailPrice, weightStr),
-      sku: `SKU-${baseWeight}-${w}-${index}`, // Using baseWeight in SKU for clarity
-      wholesalePrice: wholesalePrice,
-      wholesaleMinQuantity: wholesaleMinQuantity,
+      sku: `SKU-${baseWeight}-${w}-${index}`,
     };
   });
 };
@@ -67,7 +51,6 @@ export const products: Product[] = [
     ],
     category: 'Spicy',
     defaultVariantIndex: 1, // 250g
-    // Assuming 100g as base weight for price reference
     variants: generateVariants(450, 100, [100, 250, 500]), 
   },
   {

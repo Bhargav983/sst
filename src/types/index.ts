@@ -9,8 +9,6 @@ export interface ProductVariant {
   price: number;
   pricePerUnit?: string; // e.g., "(₹5.99 / 100g)" - Calculated
   sku?: string; // Optional Stock Keeping Unit for the variant
-  wholesalePrice?: number;
-  wholesaleMinQuantity?: number;
 }
 
 export interface Product {
@@ -34,10 +32,7 @@ export interface CartItem {
   imageUrl: string;
   weight: string; // Weight of the specific variant added
   dataAiHint?: string; // from product image
-  // Fields to store original pricing for dynamic cart adjustments
-  originalRetailPrice?: number;
-  originalWholesalePrice?: number;
-  originalWholesaleMinQuantity?: number;
+  originalRetailPrice?: number; // Store original retail price if needed for dynamic adjustments
 }
 
 export interface ShippingAddress {
@@ -91,8 +86,8 @@ export interface AppUser {
   email: string | null;
   displayName?: string | null;
   phone?: string | null;
-  role?: 'retail' | 'wholesale' | 'admin';
-  isAdmin?: boolean; // Kept for backward compatibility or more granular admin checks if needed
+  role?: 'retail' | 'admin'; // Removed 'wholesale'
+  isAdmin?: boolean;
   addresses?: ShippingAddress[];
 }
 
@@ -104,4 +99,3 @@ export interface Review {
   date: string; // e.g., "July 15, 2024"
   avatarUrl?: string;
 }
-

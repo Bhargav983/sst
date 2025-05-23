@@ -26,7 +26,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         const parsedUser: AppUser = JSON.parse(storedUser);
         setUser({
           ...parsedUser,
-          addresses: parsedUser.addresses || [] // Ensure addresses is always an array
+          role: parsedUser.role === 'wholesale' ? 'retail' : parsedUser.role, // Convert old wholesale to retail
+          addresses: parsedUser.addresses || [] 
         });
       } catch (e) {
         console.error("Failed to parse stored user", e);
@@ -43,7 +44,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         displayName: userToLogin.displayName || null,
         phone: userToLogin.phone || null,
         isAdmin: userToLogin.isAdmin || false,
-        addresses: userToLogin.addresses || [], // Initialize addresses
+        role: userToLogin.role === 'wholesale' ? 'retail' : (userToLogin.role || 'retail'), // Ensure role is set, default to retail
+        addresses: userToLogin.addresses || [],
     };
     setUser(completeUser);
     localStorage.setItem('sutraCartUser', JSON.stringify(completeUser));
@@ -52,7 +54,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const logout = () => {
     setUser(null);
     localStorage.removeItem('sutraCartUser');
-    // Optionally clear other user-specific data from localStorage if needed
   };
 
   const addAddress = (newAddressData: Omit<ShippingAddress, 'id'> & { label: string }) => {
@@ -60,7 +61,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       if (!currentUser) return null;
       const newAddressWithId: ShippingAddress = {
         ...newAddressData,
-        id: `addr_${Date.now().toString()}` // Simple unique ID
+        id: `addr_${Date.now().toString()}` 
       };
       const updatedUser = {
         ...currentUser,

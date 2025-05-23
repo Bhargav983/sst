@@ -42,14 +42,13 @@ export default function AdminLoginPage() {
   });
 
   const onSubmit = async (data: AdminLoginFormValues) => {
-    // Simulate admin login
-    // In a real app, you would verify admin credentials against a backend/Firebase.
-    if (data.email === 'admin@example.com' && data.password === 'password') { // Example credentials
+    if (data.email === 'admin@example.com' && data.password === 'password') { 
       login({ 
         uid: 'admin-mock-uid', 
         email: data.email, 
         displayName: 'Admin User', 
-        isAdmin: true 
+        isAdmin: true,
+        role: 'admin' 
       });
       toast({
           title: "Admin Login Successful",
