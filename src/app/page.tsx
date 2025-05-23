@@ -2,7 +2,9 @@
 import { MainLayout } from '@/components/layout/main-layout';
 import { ProductCard } from '@/components/product-card';
 import { products } from '@/data/products';
-import { HeroSlider, type Slide } from '@/components/hero-slider'; // Import HeroSlider and Slide type
+import { HeroSlider, type Slide } from '@/components/hero-slider';
+import { ReviewCard } from '@/components/review-card';
+import { reviews } from '@/data/reviews';
 
 const heroSlidesData: Slide[] = [
   {
@@ -30,7 +32,7 @@ const heroSlidesData: Slide[] = [
     title: 'Pure Ingredients, Powerful Taste',
     description: 'We source only the best quality spices and natural ingredients for an unparalleled flavor profile.',
     buttonText: 'Learn About Quality',
-    buttonLink: '/products', // Placeholder, could be an 'About Us' or specific quality page
+    buttonLink: '/products', 
   },
   {
     id: 4,
@@ -48,7 +50,7 @@ export default function HomePage() {
     <MainLayout>
       <HeroSlider slides={heroSlidesData} />
 
-      <section>
+      <section className="py-12 md:py-16">
         <h2 className="text-3xl font-semibold mb-8 text-center text-foreground">Our Signature Masala Pastes</h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
           {products.map(product => (
@@ -56,6 +58,18 @@ export default function HomePage() {
           ))}
         </div>
       </section>
+
+      <section className="py-12 md:py-16 bg-muted/30 rounded-lg">
+        <div className="container mx-auto px-4">
+          <h2 className="text-3xl font-semibold mb-10 text-center text-foreground">What Our Customers Say</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+            {reviews.slice(0,3).map(review => ( // Displaying first 3 reviews for a cleaner look, can adjust
+              <ReviewCard key={review.id} review={review} />
+            ))}
+          </div>
+        </div>
+      </section>
+
     </MainLayout>
   );
 }
