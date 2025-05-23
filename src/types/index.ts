@@ -60,6 +60,15 @@ export interface StatusHistoryEntry {
   notes?: string;
 }
 
+export interface OrderFeedback {
+  orderId: string;
+  userId?: string;
+  rating: number; // 1-5
+  comment: string;
+  isComplaint: boolean;
+  submittedAt: Date;
+}
+
 export interface Order {
   id: string;
   userId?: string;
@@ -74,6 +83,7 @@ export interface Order {
   createdAt: Date;
   updatedAt: Date;
   statusHistory?: StatusHistoryEntry[];
+  feedbackSubmitted?: boolean;
 }
 
 export interface AppUser {
@@ -94,3 +104,4 @@ export interface Review {
   date: string; // e.g., "July 15, 2024"
   avatarUrl?: string;
 }
+

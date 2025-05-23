@@ -38,7 +38,8 @@ const generateUserMockOrders = (): Order[] => {
         { status: 'Processing', timestamp: new Date(baseDate.setDate(baseDate.getDate() - 9)) },
         { status: 'Shipped', timestamp: new Date(baseDate.setDate(baseDate.getDate() - 5)) },
         { status: 'Delivered', timestamp: new Date(baseDate.setDate(baseDate.getDate() - 2)) },
-      ]
+      ],
+      feedbackSubmitted: false, // Initialize feedback status
     },
     { 
       id: 'SUTRA-USER-67890', 
@@ -60,7 +61,32 @@ const generateUserMockOrders = (): Order[] => {
         { status: 'Pending', timestamp: new Date(baseDate.setDate(baseDate.getDate() - 5)) },
         { status: 'Processing', timestamp: new Date(baseDate.setDate(baseDate.getDate() - 4)) },
         { status: 'Shipped', timestamp: new Date(baseDate.setDate(baseDate.getDate() - 1)) },
-      ]
+      ],
+      feedbackSubmitted: false,
+    },
+     { 
+      id: 'SUTRA-USER-11223', 
+      createdAt: new Date(baseDate.setDate(baseDate.getDate() - 20)), 
+      totalAmount: 75.00, 
+      status: 'Delivered', 
+      items: [
+        { id: '1', name: 'Andhra Chilli Paste', price: 12.99, quantity: 2, imageUrl: 'https://placehold.co/40x40.png', weight: '250g' },
+        { id: '3', name: 'Tamilian Tamarind Paste', price: 10.99, quantity: 1, imageUrl: 'https://placehold.co/40x40.png', weight: '200g' },
+      ],
+      itemSummary: 'Andhra Chilli Paste (x2), Tamilian Tamarind Paste (x1)',
+      customerInfo: {
+        fullName: 'Current User', email: 'user@example.com', phone: '9998887770', 
+        addressLine1: '123 User Lane', city: 'UserCity', state: 'UserState', postalCode: '10001', country: 'India'
+      },
+      subtotal: 70.00, shippingCost: 5.00, paymentStatus: 'Paid',
+      updatedAt: new Date(baseDate.setDate(baseDate.getDate() - 15)),
+      statusHistory: [
+        { status: 'Pending', timestamp: new Date(baseDate.setDate(baseDate.getDate() - 20)) },
+        { status: 'Processing', timestamp: new Date(baseDate.setDate(baseDate.getDate() - 19)) },
+        { status: 'Shipped', timestamp: new Date(baseDate.setDate(baseDate.getDate() - 18)) },
+        { status: 'Delivered', timestamp: new Date(baseDate.setDate(baseDate.getDate() - 15)) },
+      ],
+      feedbackSubmitted: true, // Example of an order where feedback was already submitted
     },
   ];
 };
@@ -177,10 +203,18 @@ export default function OrderHistoryPage() {
                     {order.itemSummary}
                   </p>
                 </CardContent>
-                <CardFooter>
+                <CardFooter className="flex justify-between items-center">
                     <Link href={`/profile/orders/${order.id}`}>
                         <Button variant="outline">View Details</Button> 
                     </Link>
+                    {order.status === 'Delivered' && !order.feedbackSubmitted && (
+                        <Link href={`/profile/orders/${order.id}?feedback=true`}>
+                            <Button variant="secondary" size="sm">Leave Feedback</Button>
+                        </Link>
+                    )}
+                     {order.status === 'Delivered' && order.feedbackSubmitted && (
+                        <span className="text-sm text-green-600">Feedback Submitted</span>
+                    )}
                 </CardFooter>
               </Card>
             ))}

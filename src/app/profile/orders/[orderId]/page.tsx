@@ -2,21 +2,50 @@
 "use client";
 
 import { useState, useEffect } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams, useRouter, useSearchParams } from 'next/navigation'; // Added useSearchParams
 import { MainLayout } from '@/components/layout/main-layout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
-import { Package, User, MapPin, DollarSign, Clock, ArrowLeft, CheckCircle, ShoppingCart, AlertTriangle, Home, Download, Loader2 } from 'lucide-react';
-import type { Order, StatusHistoryEntry, CartItem, ShippingAddress } from '@/types';
+import { 
+  Package, User, MapPin, DollarSign, Clock, ArrowLeft, CheckCircle, 
+  ShoppingCart, AlertTriangle, Home, Download, Loader2, MessageSquare, Star
+} from 'lucide-react';
+import type { Order, StatusHistoryEntry, CartItem, ShippingAddress, OrderFeedback } from '@/types';
 import { format } from 'date-fns';
 import Link from 'next/link';
 import Image from 'next/image';
 import { cn } from '@/lib/utils';
 import html2pdf from 'html2pdf.js';
-import { createRoot } from 'react-dom/client'; // Changed import
+import { createRoot } from 'react-dom/client'; 
 import { InvoiceHTMLTemplate } from '@/components/invoice/invoice-html-template';
+import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/context/auth-provider';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+  DialogFooter,
+  DialogClose,
+} from "@/components/ui/dialog";
+import { useForm, Controller } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import * as z from 'zod';
+import { Textarea } from '@/components/ui/textarea';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Label } from '@/components/ui/label';
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
 
 
 // Helper function to generate a fallback order if not found in localStorage
@@ -58,6 +87,7 @@ const generateFallbackOrder = (orderId: string): Order => {
     updatedAt: statusHistory[statusHistory.length -1].timestamp,
     statusHistory,
     userId: 'fallback-user-id',
+    feedbackSubmitted: false,
   };
 };
 
@@ -114,24 +144,51 @@ const getSafeOrderForPdf = (currentOrder: Order | null): Order => {
         statusHistory: safeStatusHistory,
         itemSummary: String(currentOrder.itemSummary || safeItems.map(i => `${i.name} (x${i.quantity})`).join(', ')),
         userId: String(currentOrder.userId || ''),
+        feedbackSubmitted: currentOrder.feedbackSubmitted || false,
     };
 };
+
+const feedbackSchema = z.object({
+  rating: z.number().min(1, { message: "Please select a rating." }).max(5),
+  comment: z.string().min(10, { message: "Comment must be at least 10 characters." }).max(500, { message: "Comment cannot exceed 500 characters." }),
+  isComplaint: z.boolean().optional(),
+});
+type FeedbackFormValues = z.infer<typeof feedbackSchema>;
 
 
 export default function UserOrderDetailPage() {
   const params = useParams();
+  const searchParams = useSearchParams();
   const orderId = params.orderId as string;
   const router = useRouter();
+  const { user } = useAuth();
+  const { toast } = useToast();
 
   const [order, setOrder] = useState<Order | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isClient, setIsClient] = useState(false);
   const [orderForPdf, setOrderForPdf] = useState<Order | null>(null);
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
-
+  const [isFeedbackDialogOpen, setIsFeedbackDialogOpen] = useState(false);
+  
+  const feedbackForm = useForm<FeedbackFormValues>({
+    resolver: zodResolver(feedbackSchema),
+    defaultValues: {
+      rating: 0,
+      comment: '',
+      isComplaint: false,
+    },
+  });
 
   useEffect(() => {
     setIsClient(true); 
+    if (searchParams.get('feedback') === 'true') {
+      setIsFeedbackDialogOpen(true);
+    }
+  }, [searchParams]);
+
+
+  useEffect(() => {
     if (!orderId) {
       setIsLoading(false);
       return;
@@ -198,6 +255,7 @@ export default function UserOrderDetailPage() {
                   statusHistory,
                   itemSummary: String(o?.itemSummary || items.map(item => `${item.name} (x${item.quantity})`).join(', ')),
                   userId: String(o?.userId || ''),
+                  feedbackSubmitted: o?.feedbackSubmitted || false,
                 };
               });
               foundOrder = mappedOrders.find(o => o.id === orderId);
@@ -254,24 +312,22 @@ export default function UserOrderDetailPage() {
     if (!invoiceContainer) {
       invoiceContainer = document.createElement('div');
       invoiceContainer.id = invoiceElementId;
-      // Apply styles to keep it off-screen but renderable for html2pdf
-      invoiceContainer.style.position = 'fixed'; // Use fixed to ensure it's out of flow but dimensions are respected
-      invoiceContainer.style.left = '-200vw'; // Way off-screen to the left
+      invoiceContainer.style.position = 'fixed'; 
+      invoiceContainer.style.left = '-200vw'; 
       invoiceContainer.style.top = '0px';
-      invoiceContainer.style.zIndex = '-1'; // Ensure it's behind everything
-      invoiceContainer.style.width = '210mm'; // A4 width
-      invoiceContainer.style.visibility = 'hidden'; // Keep it hidden but allows rendering
+      invoiceContainer.style.zIndex = '-1'; 
+      invoiceContainer.style.width = '210mm'; 
+      invoiceContainer.style.visibility = 'hidden'; 
       document.body.appendChild(invoiceContainer);
     }
   
-    const root = createRoot(invoiceContainer); // Changed usage
+    const root = createRoot(invoiceContainer); 
     root.render(<InvoiceHTMLTemplate order={orderForPdf} />);
   
-    // Give React a moment to render the component into the hidden div
     await new Promise(resolve => setTimeout(resolve, 500)); 
   
     const opt = {
-      margin: 5, // mm for all sides
+      margin: 5, 
       filename: `SutraCart-Invoice-${orderForPdf.id}.pdf`,
       image: { type: 'jpeg', quality: 0.98 },
       html2canvas: { scale: 2, logging: false, useCORS: true, scrollY: 0, windowWidth: invoiceContainer.scrollWidth, windowHeight: invoiceContainer.scrollHeight },
@@ -280,7 +336,6 @@ export default function UserOrderDetailPage() {
     };
   
     try {
-      // Ensure the element passed to html2pdf is the one containing the template
       const elementToPrint = invoiceContainer.firstChild; 
       if (elementToPrint) {
         await html2pdf().from(elementToPrint).set(opt).save();
@@ -289,7 +344,6 @@ export default function UserOrderDetailPage() {
       }
     } catch (error) {
       console.error("Error generating PDF with html2pdf.js:", error);
-      // Consider adding a user-facing toast notification for the error
     } finally {
       root.unmount();
       if (invoiceContainer && invoiceContainer.parentNode === document.body) {
@@ -297,6 +351,46 @@ export default function UserOrderDetailPage() {
       }
       setIsGeneratingPdf(false);
     }
+  };
+
+  const handleFeedbackSubmit = (data: FeedbackFormValues) => {
+    if (!order || !user) return;
+
+    const feedbackEntry: OrderFeedback = {
+      orderId: order.id,
+      userId: user.uid,
+      rating: data.rating,
+      comment: data.comment,
+      isComplaint: data.isComplaint || false,
+      submittedAt: new Date(),
+    };
+    console.log("Feedback Submitted:", feedbackEntry); // Mock submission
+    
+    toast({
+      title: "Feedback Received",
+      description: "Thank you for sharing your thoughts!",
+    });
+
+    // Update order state and localStorage
+    const updatedOrder = { ...order, feedbackSubmitted: true };
+    setOrder(updatedOrder);
+    setOrderForPdf(getSafeOrderForPdf(updatedOrder));
+
+
+    if (typeof window !== 'undefined') {
+      const storedOrdersRaw = localStorage.getItem('userMockOrders');
+      if (storedOrdersRaw) {
+        try {
+          let allOrders: Order[] = JSON.parse(storedOrdersRaw);
+          allOrders = allOrders.map(o => o.id === order.id ? updatedOrder : o);
+          localStorage.setItem('userMockOrders', JSON.stringify(allOrders));
+        } catch (e) {
+          console.error("Error updating userMockOrders in localStorage", e);
+        }
+      }
+    }
+    setIsFeedbackDialogOpen(false);
+    feedbackForm.reset();
   };
 
 
@@ -332,12 +426,13 @@ export default function UserOrderDetailPage() {
   }
   
   const canDownloadPdf = isClient && orderForPdf && typeof orderForPdf.id === 'string' && orderForPdf.id && !orderForPdf.id.startsWith('emergency');
+  const canLeaveFeedback = order.status === 'Delivered' && !order.feedbackSubmitted;
 
   return (
     <MainLayout>
       <div className="space-y-8">
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <Button variant="outline" size="sm" onClick={() => router.push('/profile/orders')}>
               <ArrowLeft className="mr-2 h-4 w-4" /> Back to My Orders
             </Button>
@@ -354,6 +449,100 @@ export default function UserOrderDetailPage() {
               }
               {isGeneratingPdf ? 'Generating...' : (canDownloadPdf ? 'Download Invoice' : 'Invoice Unavailable')}
             </Button>
+             {canLeaveFeedback && (
+              <Dialog open={isFeedbackDialogOpen} onOpenChange={setIsFeedbackDialogOpen}>
+                <DialogTrigger asChild>
+                  <Button variant="secondary" size="sm">
+                    <MessageSquare className="mr-2 h-4 w-4" /> Leave Feedback
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="sm:max-w-[480px]">
+                  <DialogHeader>
+                    <DialogTitle>Share Your Feedback for Order #{order.id}</DialogTitle>
+                    <DialogDescription>
+                      We value your opinion. Please rate your experience and leave a comment.
+                    </DialogDescription>
+                  </DialogHeader>
+                  <Form {...feedbackForm}>
+                    <form onSubmit={feedbackForm.handleSubmit(handleFeedbackSubmit)} className="space-y-6 py-4">
+                      <FormField
+                        control={feedbackForm.control}
+                        name="rating"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Your Rating</FormLabel>
+                            <FormControl>
+                               <div className="flex gap-1">
+                                {[1, 2, 3, 4, 5].map((star) => (
+                                  <Button
+                                    type="button"
+                                    key={star}
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={() => field.onChange(star)}
+                                    className={cn(
+                                      "h-8 w-8 p-1",
+                                      field.value >= star ? "text-yellow-400" : "text-muted-foreground hover:text-yellow-300"
+                                    )}
+                                  >
+                                    <Star className={cn("h-6 w-6", field.value >= star && "fill-yellow-400")} />
+                                  </Button>
+                                ))}
+                              </div>
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={feedbackForm.control}
+                        name="comment"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Your Comments</FormLabel>
+                            <FormControl>
+                              <Textarea placeholder="Tell us about your experience..." {...field} rows={4} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={feedbackForm.control}
+                        name="isComplaint"
+                        render={({ field }) => (
+                          <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-3 shadow-sm">
+                            <FormControl>
+                              <Checkbox
+                                checked={field.value}
+                                onCheckedChange={field.onChange}
+                              />
+                            </FormControl>
+                            <div className="space-y-1 leading-none">
+                              <FormLabel>This is a complaint</FormLabel>
+                            </div>
+                          </FormItem>
+                        )}
+                      />
+                      <DialogFooter>
+                        <DialogClose asChild>
+                          <Button type="button" variant="outline">Cancel</Button>
+                        </DialogClose>
+                        <Button type="submit" disabled={feedbackForm.formState.isSubmitting}>
+                          {feedbackForm.formState.isSubmitting ? "Submitting..." : "Submit Feedback"}
+                        </Button>
+                      </DialogFooter>
+                    </form>
+                  </Form>
+                </DialogContent>
+              </Dialog>
+            )}
+            {order.status === 'Delivered' && order.feedbackSubmitted && (
+                <div className="flex items-center gap-1.5 text-sm text-green-600 bg-green-500/10 px-3 py-1.5 rounded-md">
+                    <CheckCircle className="h-4 w-4" />
+                    Feedback Submitted
+                </div>
+            )}
           </div>
           <h1 className="text-2xl sm:text-3xl font-bold text-center sm:text-left mt-4 sm:mt-0">Order Details</h1>
           {order.status && 
@@ -427,7 +616,7 @@ export default function UserOrderDetailPage() {
                 <p>{order.customerInfo?.country || 'N/A'}</p>
                 <p className="mt-2">
                     <span className="text-muted-foreground">Email:</span> {order.customerInfo?.email || 'N/A'}
-                </p>
+                 </p>
                  <p>
                     <span className="text-muted-foreground">Phone:</span> {order.customerInfo?.phone || 'N/A'}
                  </p>
